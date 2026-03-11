@@ -10,7 +10,6 @@ from providers.base import BaseProvider, LLMResponse, Message
 from providers.openai_provider import OpenAIProvider
 from providers.anthropic_provider import AnthropicProvider
 from providers.google_provider import GoogleProvider
-from providers.ollama_provider import OllamaProvider
 from providers.groq_provider import GroqProvider
 from providers.custom_provider import CustomProvider
 
@@ -26,13 +25,6 @@ class LLMRouter:
 
     def _load_providers(self) -> None:
         """Initialize all configured providers from environment variables."""
-        # Ollama (local)
-        ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        self.providers["ollama"] = OllamaProvider(
-            base_url=ollama_url,
-            default_model=os.getenv("OLLAMA_DEFAULT_MODEL", "qwen2.5-coder:32b"),
-        )
-
         # OpenAI
         if key := os.getenv("OPENAI_API_KEY"):
             self.providers["openai"] = OpenAIProvider(
@@ -85,8 +77,8 @@ class LLMRouter:
             )
 
         # Set default and fallback
-        self.default_provider = os.getenv("DEFAULT_PROVIDER", "ollama")
-        self.fallback_order = [p for p in ["ollama", "alibaba", "groq", "openai", "anthropic", "google", "custom"] if p in self.providers]
+        self.default_provider = os.getenv("DEFAULT_PROVIDER", "alibaba")
+        self.fallback_order = [p for p in ["alibaba", "groq", "openai", "anthropic", "google", "custom"] if p in self.providers]
 
     def get_provider(self, name: str | None = None) -> BaseProvider:
         """Get a specific provider or the default one."""

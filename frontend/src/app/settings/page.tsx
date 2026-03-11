@@ -24,7 +24,7 @@ const settingsSections = [
     icon: Bot,
     color: "#6366f1",
     title: "API Providers",
-    description: "Configure LLM providers (OpenAI, Claude, Gemini, Ollama...)",
+    description: "Configure LLM providers (OpenAI, Claude, Gemini, Qwen...)",
   },
   {
     href: "/voice",

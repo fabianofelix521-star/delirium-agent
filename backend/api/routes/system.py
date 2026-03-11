@@ -27,15 +27,6 @@ async def get_services_status() -> list[dict]:
     """Check status of all dependent services."""
     services = []
 
-    # Ollama
-    try:
-        async with httpx.AsyncClient(timeout=3) as c:
-            r = await c.get("http://localhost:11434/api/tags")
-            models = [m["name"] for m in r.json().get("models", [])]
-            services.append({"name": "Ollama", "status": "online", "details": {"models": models}})
-    except Exception:
-        services.append({"name": "Ollama", "status": "offline", "details": {}})
-
     # Redis
     try:
         async with httpx.AsyncClient(timeout=3) as c:

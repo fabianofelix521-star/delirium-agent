@@ -22,7 +22,7 @@
 
 ## ✨ Features
 
-- 🧠 **Multi-Provider LLM Support** — OpenAI, Anthropic, Google, Alibaba (Qwen), Groq, Ollama, and any OpenAI-compatible API
+- 🧠 **Multi-Provider LLM Support** — OpenAI, Anthropic, Google, Alibaba (Qwen), Groq, and any OpenAI-compatible API
 - 💬 **Chat Interface** — Streaming responses, markdown rendering, code blocks with syntax highlighting
 - 🎤 **Voice Mode** — Jarvis-style voice conversation with waveform visualization
 - 🛠️ **Tools System** — Code execution, web browsing, file management, shell commands, and more
@@ -76,7 +76,7 @@ make dev
 │                  │                                 │
 │  ┌───────────────┼────────────────────────────┐  │
 │  │         PROVIDER LAYER                     │  │
-│  │ Ollama│OpenAI│Claude│Gemini│Groq│Custom    │  │
+│  │ OpenAI│Claude│Gemini│Groq│Alibaba│Custom │  │
 │  └───────────────┴────────────────────────────┘  │
 │                                                    │
 │  ┌────────────┐ ┌──────────┐ ┌────────────────┐  │
@@ -88,13 +88,13 @@ make dev
 
 ## 📦 Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | Next.js 16, TypeScript 5, Tailwind CSS, React 19 |
-| **Backend** | FastAPI, Python 3.11+, Pydantic V2 |
-| **LLM** | Multi-provider: Ollama, OpenAI, Anthropic, Google, Groq, Custom |
-| **Database** | Redis (cache), Qdrant (vectors), SQLite (timeline) |
-| **Infrastructure** | Docker, Caddy (reverse proxy + auto-SSL) |
+| Layer              | Technology                                                              |
+| ------------------ | ----------------------------------------------------------------------- |
+| **Frontend**       | Next.js 16, TypeScript 5, Tailwind CSS, React 19                        |
+| **Backend**        | FastAPI, Python 3.11+, Pydantic V2                                      |
+| **LLM**            | Multi-provider: OpenAI, Anthropic, Google, Alibaba (Qwen), Groq, Custom |
+| **Database**       | Redis (cache), Qdrant (vectors), SQLite (timeline)                      |
+| **Infrastructure** | Docker, Caddy (reverse proxy + auto-SSL)                                |
 
 ## 📂 Project Structure
 

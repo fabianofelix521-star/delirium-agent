@@ -200,7 +200,6 @@ export default function DashboardPage() {
     : [];
 
   const serviceIcons: Record<string, string> = {
-    Ollama: "🧠",
     Redis: "🔴",
     Qdrant: "📊",
   };

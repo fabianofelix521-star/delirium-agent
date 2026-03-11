@@ -26,7 +26,6 @@ interface ModelEntry {
 
 const PROVIDER_ICONS: Record<string, string> = {
   alibaba: "☁️",
-  ollama: "🧠",
   openai: "🤖",
   anthropic: "🟣",
   google: "🔵",

@@ -17,7 +17,7 @@ _settings: dict[str, Any] = {
         "theme": "dark",
     },
     "llm": {
-        "default_provider": os.getenv("DEFAULT_PROVIDER", "ollama"),
+        "default_provider": os.getenv("DEFAULT_PROVIDER", "alibaba"),
         "temperature": 0.7,
         "max_tokens": 4096,
         "auto_fallback": True,

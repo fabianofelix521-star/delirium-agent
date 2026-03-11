@@ -18,22 +18,6 @@ import {
 
 const providers = [
   {
-    id: "ollama",
-    name: "Ollama",
-    icon: "🧠",
-    description: "Local LLM inference",
-    models: ["qwen2.5-coder:32b", "llama3.1:70b", "mistral:7b"],
-    fields: [
-      {
-        key: "base_url",
-        label: "Base URL",
-        default: "http://localhost:11434",
-        type: "url",
-      },
-    ],
-    isLocal: true,
-  },
-  {
     id: "openai",
     name: "OpenAI",
     icon: "🤖",
@@ -156,7 +140,7 @@ export default function APIsPage() {
     Record<string, Record<string, string>>
   >({});
   const [enabledProviders, setEnabledProviders] = useState<Set<string>>(
-    new Set(["ollama", "alibaba"]),
+    new Set(["alibaba"]),
   );
   const [defaultProvider, setDefaultProvider] = useState("alibaba");
   const [testResults, setTestResults] = useState<

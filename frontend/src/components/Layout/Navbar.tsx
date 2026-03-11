@@ -136,7 +136,7 @@ export function Navbar() {
 
   return (
     <header
-      className="flex items-center justify-between px-5 h-[56px] shrink-0 relative z-20"
+      className="flex items-center justify-between px-3 sm:px-5 h-14 shrink-0 relative z-20"
       style={{
         background: "var(--glass-bg-solid)",
         borderBottom: "1px solid var(--glass-border)",
@@ -174,7 +174,7 @@ export function Navbar() {
                   className="fixed inset-0 z-40"
                   onClick={() => setModelOpen(false)}
                 />
-                <div className="absolute top-full left-0 mt-2 dropdown-menu z-50 animate-fade-in-scale w-64">
+                <div className="absolute top-full left-0 mt-2 dropdown-menu z-50 animate-fade-in-scale w-[calc(100vw-2rem)] sm:w-64 max-w-64">
                   <p
                     className="text-[10px] uppercase tracking-widest font-semibold px-3 py-2"
                     style={{ color: "var(--text-ghost)" }}
@@ -237,19 +237,19 @@ export function Navbar() {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-0.5">
-        {/* Search button */}
+        {/* Search button - hidden on mobile */}
         <button
           onClick={() => setSearchOpen(!searchOpen)}
-          className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/[0.04]"
+          className="hidden sm:flex w-8 h-8 rounded-lg items-center justify-center transition-all hover:bg-white/[0.04]"
           style={{ color: "var(--text-muted)" }}
           title="Search (⌘K)"
         >
           <Search size={15} strokeWidth={2} />
         </button>
 
-        {/* Notifications */}
+        {/* Notifications - hidden on mobile */}
         <button
-          className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/[0.04] relative"
+          className="hidden sm:flex w-8 h-8 rounded-lg items-center justify-center transition-all hover:bg-white/[0.04] relative"
           style={{ color: "var(--text-muted)" }}
           title="Notifications"
         >
@@ -273,7 +273,7 @@ export function Navbar() {
 
         {/* Divider */}
         <div
-          className="w-px h-5 mx-1.5"
+          className="hidden sm:block w-px h-5 mx-1.5"
           style={{ background: "var(--glass-border)" }}
         />
 
@@ -293,7 +293,10 @@ export function Navbar() {
 
           {userMenuOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setUserMenuOpen(false)}
+              />
               <div className="absolute top-full right-0 mt-2 dropdown-menu z-50 animate-fade-in-scale w-48">
                 <button
                   className="dropdown-item w-full text-left"
@@ -304,7 +307,12 @@ export function Navbar() {
                   }}
                 >
                   <LogOut size={14} style={{ color: "var(--text-muted)" }} />
-                  <span className="flex-1 text-[12px]" style={{ color: "var(--text-primary)" }}>Sign Out</span>
+                  <span
+                    className="flex-1 text-[12px]"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    Sign Out
+                  </span>
                 </button>
               </div>
             </>

@@ -397,7 +397,7 @@ export default function ChatPage() {
               </p>
 
               {/* Suggestions grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 w-full max-w-2xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 w-full max-w-2xl">
                 {suggestions.map((s, i) => {
                   const Icon = s.icon;
                   return (
@@ -434,7 +434,7 @@ export default function ChatPage() {
               </div>
 
               {/* Capabilities bar */}
-              <div className="flex items-center gap-3 mt-8">
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-6 sm:mt-8">
                 {[
                   { icon: "☁️", label: activeModel },
                   { icon: "⚡", label: "6 Tools" },
@@ -632,7 +632,7 @@ export default function ChatPage() {
           {showScrollBtn && messages.length > 0 && (
             <button
               onClick={scrollToBottom}
-              className="fixed bottom-28 right-8 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 z-30 animate-fade-in"
+              className="fixed bottom-24 right-6 md:right-8 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 z-30 animate-fade-in"
               style={{
                 background: "var(--glass-bg-solid)",
                 border: "1px solid var(--glass-border)",
@@ -713,7 +713,7 @@ export default function ChatPage() {
               })}
               <div className="flex-1" />
               <span
-                className="text-[10px] font-medium"
+                className="hidden md:inline text-[10px] font-medium"
                 style={{ color: "var(--text-ghost)" }}
               >
                 <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> new line

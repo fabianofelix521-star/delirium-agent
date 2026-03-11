@@ -25,7 +25,7 @@ export function MobileNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 flex items-center justify-around z-50"
+      className="md:hidden flex items-center justify-around shrink-0"
       style={{
         height: 60,
         paddingBottom: "env(safe-area-inset-bottom, 0px)",

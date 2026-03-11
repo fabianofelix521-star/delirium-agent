@@ -430,7 +430,7 @@ export default function CodeChatPage() {
       {/* Side Panel - Repos & Files */}
       {sidePanel && (
         <div
-          className="w-[280px] shrink-0 flex flex-col border-r overflow-hidden animate-fade-in"
+          className="fixed inset-0 z-40 md:relative md:inset-auto md:z-auto w-full md:w-[280px] shrink-0 flex flex-col border-r overflow-hidden animate-fade-in"
           style={{
             background: "var(--glass-bg-solid)",
             borderColor: "var(--glass-border)",
@@ -872,7 +872,7 @@ export default function CodeChatPage() {
           {showScrollBtn && messages.length > 0 && (
             <button
               onClick={scrollToBottom}
-              className="fixed bottom-28 right-8 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 z-30 animate-fade-in"
+              className="fixed bottom-24 right-6 md:right-8 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 z-30 animate-fade-in"
               style={{
                 background: "var(--glass-bg-solid)",
                 border: "1px solid var(--glass-border)",
@@ -962,7 +962,7 @@ export default function CodeChatPage() {
               )}
               <div className="flex-1" />
               <span
-                className="text-[10px] font-medium"
+                className="hidden md:inline text-[10px] font-medium"
                 style={{ color: "var(--text-ghost)" }}
               >
                 <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> new line

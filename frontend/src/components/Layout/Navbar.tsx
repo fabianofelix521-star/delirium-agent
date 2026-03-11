@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Zap,
   Sparkles,
+  LogOut,
 } from "lucide-react";
 
 interface ModelEntry {
@@ -48,6 +49,7 @@ export function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const [modelOpen, setModelOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [models, setModels] = useState<ModelEntry[]>(fallbackModels);
   const [selectedModel, setSelectedModel] = useState<ModelEntry>(
     fallbackModels[0],
@@ -275,17 +277,39 @@ export function Navbar() {
           style={{ background: "var(--glass-border)" }}
         />
 
-        {/* User avatar */}
-        <button
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold transition-all hover:scale-105 relative overflow-hidden"
-          style={{
-            background: "var(--accent-gradient)",
-            color: "white",
-            boxShadow: "0 2px 8px rgba(99,102,241,0.25)",
-          }}
-        >
-          F
-        </button>
+        {/* User avatar with menu */}
+        <div className="relative">
+          <button
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold transition-all hover:scale-105 relative overflow-hidden"
+            style={{
+              background: "var(--accent-gradient)",
+              color: "white",
+              boxShadow: "0 2px 8px rgba(99,102,241,0.25)",
+            }}
+          >
+            F
+          </button>
+
+          {userMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+              <div className="absolute top-full right-0 mt-2 dropdown-menu z-50 animate-fade-in-scale w-48">
+                <button
+                  className="dropdown-item w-full text-left"
+                  onClick={() => {
+                    localStorage.removeItem("delirium_token");
+                    localStorage.removeItem("delirium_selected_model");
+                    window.location.href = "/login";
+                  }}
+                >
+                  <LogOut size={14} style={{ color: "var(--text-muted)" }} />
+                  <span className="flex-1 text-[12px]" style={{ color: "var(--text-primary)" }}>Sign Out</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Command palette search overlay */}

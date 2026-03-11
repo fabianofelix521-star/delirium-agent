@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/Layout/Sidebar";
-import { Navbar } from "@/components/Layout/Navbar";
-import { MobileNav } from "@/components/Layout/MobileNav";
+import { AuthGuard } from "@/components/Layout/AuthGuard";
+import { AppShell } from "@/components/Layout/AppShell";
 
 const inter = Inter({
     subsets: ["latin"],
@@ -40,21 +39,9 @@ export default function RootLayout({
             <body
                 className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
             >
-                <div className="flex h-screen overflow-hidden">
-                    {/* Sidebar - desktop only */}
-                    <Sidebar />
-
-                    {/* Main area */}
-                    <div className="flex flex-1 flex-col overflow-hidden">
-                        <Navbar />
-                        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
-                            {children}
-                        </main>
-                    </div>
-                </div>
-
-                {/* Mobile bottom nav */}
-                <MobileNav />
+                <AuthGuard>
+                    <AppShell>{children}</AppShell>
+                </AuthGuard>
             </body>
         </html>
     );

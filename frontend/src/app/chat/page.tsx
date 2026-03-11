@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 import {
   Send,
@@ -41,9 +42,11 @@ interface Message {
 }
 
 export default function ChatPage() {
+  const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [showSteps, setShowSteps] = useState<Record<string, boolean>>({});
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -52,6 +55,41 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load existing conversation from URL param
+  const loadConversation = useCallback((id: string) => {
+    fetch(`${API_BASE}/api/chat/conversations/${id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) return;
+        setConversationId(data.id);
+        const msgs: Message[] = data.messages.map(
+          (m: { role: string; content: string }, i: number) => ({
+            id: `${data.id}-${i}`,
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            timestamp: data.updated_at * 1000,
+          }),
+        );
+        setMessages(msgs);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id) loadConversation(id);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.id === conversationId) {
+        setMessages([]);
+        setConversationId(null);
+      }
+    };
+    window.addEventListener("delirium-conversation-deleted", handler);
+    return () =>
+      window.removeEventListener("delirium-conversation-deleted", handler);
+  }, [searchParams, loadConversation, conversationId]);
 
   // Sync model selection from Navbar
   useEffect(() => {
@@ -139,6 +177,7 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMsg.content,
+          conversation_id: conversationId || undefined,
           stream: true,
           provider: activeProvider,
           model: activeModel,
@@ -168,6 +207,9 @@ export default function ChatPage() {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
+                if (data.type === "start" && data.conversation_id) {
+                  setConversationId(data.conversation_id);
+                }
                 if (data.type === "token") {
                   setMessages((prev) => {
                     const updated = [...prev];
@@ -183,80 +225,31 @@ export default function ChatPage() {
           }
         }
       } else {
-        // Demo fallback with agent steps
-        const steps: AgentStep[] = [
-          {
-            id: "s1",
-            type: "thinking",
-            label: "Understanding intent...",
-            status: "done",
-          },
-          {
-            id: "s2",
-            type: "search",
-            label: "Checking capabilities...",
-            status: "done",
-          },
-          {
-            id: "s3",
-            type: "result",
-            label: "Generating response",
-            status: "done",
-          },
-        ];
+        // No backend connection fallback
         setMessages((prev) => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
-          if (last.role === "assistant") last.steps = steps;
+          if (last.role === "assistant") {
+            last.content =
+              "⚡ **Backend unavailable.** Start the backend server and configure an LLM provider in **Settings → APIs**.";
+            if (last.steps) last.steps[0].status = "done";
+          }
           return updated;
         });
-
-        const demo =
-          'Hello! I\'m **Delirium Infinite**, your autonomous AI agent. 🚀\n\nI can help you with:\n- 💻 **Code execution** — write and run code in any language\n- 🌐 **Web browsing** — search, scrape, and interact with websites\n- 📁 **File management** — read, write, search, and organize files\n- 📧 **Communication** — email, WhatsApp, Telegram\n- 🔧 **System tasks** — shell commands, processes, monitoring\n\nConfigure your LLM provider in **Settings → APIs** to get started!\n\n```python\nprint("Welcome to the future! 🔥")\n```';
-        for (let i = 0; i < demo.length; i++) {
-          await new Promise((r) => setTimeout(r, 8));
-          setMessages((prev) => {
-            const u = [...prev];
-            const l = u[u.length - 1];
-            if (l.role === "assistant") l.content = demo.slice(0, i + 1);
-            return [...u];
-          });
-        }
       }
     } catch {
-      const fallbackSteps: AgentStep[] = [
-        {
-          id: "s1",
-          type: "thinking",
-          label: "Connecting to backend...",
-          status: "done",
-        },
-        {
-          id: "s2",
-          type: "result",
-          label: "Running in demo mode",
-          status: "done",
-        },
-      ];
       setMessages((prev) => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
-        if (last.role === "assistant") last.steps = fallbackSteps;
+        if (last.role === "assistant") {
+          last.content =
+            "⚡ **Cannot reach backend.** Make sure the server is running.";
+          if (last.steps) last.steps[0].status = "done";
+        }
         return updated;
       });
-
-      const fallback =
-        "⚡ **Delirium Infinite** is running in demo mode.\n\nStart the backend server and configure an LLM provider in **Settings → APIs** to enable real AI conversations.\n\nExplore the interface — check out **Tools**, **Dashboard**, and **Voice**!";
-      for (let i = 0; i < fallback.length; i++) {
-        await new Promise((r) => setTimeout(r, 6));
-        setMessages((prev) => {
-          const u = [...prev];
-          const l = u[u.length - 1];
-          if (l.role === "assistant") l.content = fallback.slice(0, i + 1);
-          return [...u];
-        });
-      }
     } finally {
+      window.dispatchEvent(new Event("delirium-conversation-update"));
       setIsStreaming(false);
     }
   };

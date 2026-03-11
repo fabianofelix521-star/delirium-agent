@@ -73,6 +73,20 @@ async def list_conversations():
     return agent.list_conversations()
 
 
+@router.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """Get a conversation with its messages."""
+    if conversation_id not in agent.conversations:
+        return {"error": "Conversation not found"}
+    convo = agent.conversations[conversation_id]
+    return {
+        "id": convo.id,
+        "title": convo.title,
+        "messages": [{"role": m.role, "content": m.content} for m in convo.messages if m.role != "system"],
+        "updated_at": convo.updated_at,
+    }
+
+
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(conversation_id: str):
     """Delete a conversation."""

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import {
   Settings,
   ChevronDown,
@@ -161,29 +162,71 @@ export default function APIsPage() {
   const [testResults, setTestResults] = useState<
     Record<string, "success" | "failed" | "testing">
   >({});
+  const [saveSuccess, setSaveSuccess] = useState<Record<string, boolean>>({});
+
+  // Load saved configs from localStorage
+  useEffect(() => {
+    const loaded: Record<string, Record<string, string>> = {};
+    providers.forEach((p) => {
+      const saved = localStorage.getItem(`delirium_provider_${p.id}`);
+      if (saved)
+        try {
+          loaded[p.id] = JSON.parse(saved);
+        } catch {}
+    });
+    if (Object.keys(loaded).length > 0)
+      setConfigs((prev) => ({ ...prev, ...loaded }));
+    const savedDefault = localStorage.getItem("delirium_default_provider");
+    if (savedDefault) setDefaultProvider(savedDefault);
+    const savedEnabled = localStorage.getItem("delirium_enabled_providers");
+    if (savedEnabled)
+      try {
+        setEnabledProviders(new Set(JSON.parse(savedEnabled)));
+      } catch {}
+  }, []);
 
   const toggleProvider = (id: string) => {
     setEnabledProviders((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      localStorage.setItem(
+        "delirium_enabled_providers",
+        JSON.stringify([...next]),
+      );
       return next;
     });
   };
 
-  const testConnection = (id: string) => {
+  const testConnection = async (id: string) => {
     setTestResults((prev) => ({ ...prev, [id]: "testing" }));
-    setTimeout(() => {
+    try {
+      const res = await fetch(`${API_BASE}/api/settings/providers/test/${id}`, {
+        method: "POST",
+      });
+      const data = await res.json();
       setTestResults((prev) => ({
         ...prev,
-        [id]:
-          id === "ollama"
-            ? "success"
-            : Math.random() > 0.5
-              ? "success"
-              : "failed",
+        [id]: data.status === "connected" ? "success" : "failed",
       }));
-    }, 1500);
+    } catch {
+      setTestResults((prev) => ({ ...prev, [id]: "failed" }));
+    }
+  };
+
+  const saveProvider = async (id: string) => {
+    const config = configs[id] || {};
+    await fetch(`${API_BASE}/api/settings/`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: `provider_${id}`, settings: config }),
+    }).catch(() => {});
+    localStorage.setItem(`delirium_provider_${id}`, JSON.stringify(config));
+    setSaveSuccess((prev) => ({ ...prev, [id]: true }));
+    setTimeout(
+      () => setSaveSuccess((prev) => ({ ...prev, [id]: false })),
+      2000,
+    );
   };
 
   return (
@@ -228,7 +271,10 @@ export default function APIsPage() {
           </div>
           <select
             value={defaultProvider}
-            onChange={(e) => setDefaultProvider(e.target.value)}
+            onChange={(e) => {
+              setDefaultProvider(e.target.value);
+              localStorage.setItem("delirium_default_provider", e.target.value);
+            }}
             className="input-glass text-xs py-1.5 px-3"
           >
             {[...enabledProviders].map((id) => (
@@ -406,8 +452,16 @@ export default function APIsPage() {
                       >
                         <TestTube size={13} /> Test
                       </button>
-                      <button className="btn-primary flex items-center gap-1.5">
-                        <Save size={13} /> Save
+                      <button
+                        onClick={() => saveProvider(provider.id)}
+                        className="btn-primary flex items-center gap-1.5"
+                      >
+                        {saveSuccess[provider.id] ? (
+                          <Check size={13} />
+                        ) : (
+                          <Save size={13} />
+                        )}
+                        {saveSuccess[provider.id] ? "Saved!" : "Save"}
                       </button>
                     </div>
                   </div>

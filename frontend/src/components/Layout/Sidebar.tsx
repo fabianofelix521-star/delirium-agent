@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { API_BASE } from "@/lib/api";
 import {
   MessageCircle,
   Mic,
@@ -18,40 +19,72 @@ import {
   Sparkles,
   Plus,
   Hash,
-  MoreHorizontal,
+  Trash2,
   Zap,
   Code2,
 } from "lucide-react";
 
 const navItems = [
-  { href: "/chat", label: "Chat", icon: MessageCircle, badge: null },
-  { href: "/code", label: "Code", icon: Code2, badge: "new" },
-  { href: "/voice", label: "Voice", icon: Mic, badge: null },
-  { href: "/tools", label: "Tools", icon: Wrench, badge: "12" },
-  { href: "/memory", label: "Memory", icon: Brain, badge: null },
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    badge: null,
-  },
-  { href: "/plugins", label: "Plugins", icon: Puzzle, badge: null },
-  { href: "/integrations", label: "Integrations", icon: Link2, badge: null },
-  { href: "/agents", label: "Agents", icon: Bot, badge: "4" },
-  { href: "/settings", label: "Settings", icon: Settings, badge: null },
+  { href: "/chat", label: "Chat", icon: MessageCircle },
+  { href: "/code", label: "Code", icon: Code2 },
+  { href: "/voice", label: "Voice", icon: Mic },
+  { href: "/tools", label: "Tools", icon: Wrench },
+  { href: "/memory", label: "Memory", icon: Brain },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/plugins", label: "Plugins", icon: Puzzle },
+  { href: "/integrations", label: "Integrations", icon: Link2 },
+  { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-const recentConversations = [
-  { id: "1", title: "Python web scraping", time: "2min" },
-  { id: "2", title: "React migration plan", time: "1h" },
-  { id: "3", title: "FastAPI CORS debug", time: "3h" },
-  { id: "4", title: "Deploy Oracle Cloud", time: "1d" },
-];
+interface ConversationItem {
+  id: string;
+  title: string;
+  updated_at: number;
+  message_count: number;
+}
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() / 1000 - ts;
+  if (diff < 60) return "agora";
+  if (diff < 3600) return `${Math.floor(diff / 60)}min`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const isChat = pathname === "/chat" || pathname?.startsWith("/chat/");
+
+  const fetchConversations = useCallback(() => {
+    fetch(`${API_BASE}/api/chat/conversations`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setConversations(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchConversations();
+    const handler = () => fetchConversations();
+    window.addEventListener("delirium-conversation-update", handler);
+    return () =>
+      window.removeEventListener("delirium-conversation-update", handler);
+  }, [fetchConversations]);
+
+  const deleteConversation = (id: string) => {
+    fetch(`${API_BASE}/api/chat/conversations/${id}`, { method: "DELETE" })
+      .then(() => {
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+        window.dispatchEvent(
+          new CustomEvent("delirium-conversation-deleted", { detail: { id } }),
+        );
+      })
+      .catch(() => {});
+  };
 
   return (
     <aside
@@ -127,7 +160,7 @@ export function Sidebar() {
       )}
 
       {/* Recent conversations (only when on chat and expanded) */}
-      {!collapsed && isChat && (
+      {!collapsed && isChat && conversations.length > 0 && (
         <div className="px-4 pt-2 pb-1 animate-fade-in">
           <p
             className="text-[10px] uppercase tracking-widest font-semibold px-1 mb-1.5"
@@ -136,8 +169,12 @@ export function Sidebar() {
             Recent
           </p>
           <div className="space-y-0.5">
-            {recentConversations.map((conv) => (
-              <div key={conv.id} className="conversation-item group">
+            {conversations.slice(0, 8).map((conv) => (
+              <Link
+                key={conv.id}
+                href={`/chat?id=${conv.id}`}
+                className="conversation-item group"
+              >
                 <Hash
                   size={12}
                   style={{ color: "var(--text-ghost)" }}
@@ -153,15 +190,20 @@ export function Sidebar() {
                   className="text-[10px] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{ color: "var(--text-ghost)" }}
                 >
-                  {conv.time}
+                  {timeAgo(conv.updated_at)}
                 </span>
                 <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    deleteConversation(conv.id);
+                  }}
                   className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-white/[0.05]"
                   style={{ color: "var(--text-ghost)" }}
                 >
-                  <MoreHorizontal size={12} />
+                  <Trash2 size={12} />
                 </button>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -222,17 +264,6 @@ export function Sidebar() {
                 }}
               />
               {!collapsed && <span className="flex-1">{item.label}</span>}
-              {!collapsed && item.badge && (
-                <span
-                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                  style={{
-                    background: "rgba(99,102,241,0.1)",
-                    color: "var(--accent-indigo)",
-                  }}
-                >
-                  {item.badge}
-                </span>
-              )}
 
               {!isActive && (
                 <div
@@ -278,7 +309,7 @@ export function Sidebar() {
                 className="text-[11px] font-semibold"
                 style={{ color: "var(--text-secondary)" }}
               >
-                Agent Ready
+                Agent Online
               </p>
               <p className="text-[9px]" style={{ color: "var(--text-ghost)" }}>
                 <Zap
@@ -286,7 +317,7 @@ export function Sidebar() {
                   className="inline mr-0.5"
                   style={{ color: "var(--success)" }}
                 />
-                Ollama · qwen2.5
+                {conversations.length} conversations
               </p>
             </div>
           )}

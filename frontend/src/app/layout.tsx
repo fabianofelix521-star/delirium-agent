@@ -35,7 +35,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" data-theme="dark">
+    <html lang="pt-BR" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("delirium_theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}`,
+          }}
+        />
+      </head>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >

@@ -1,0 +1,41 @@
+# Caddyfile - Delirium Infinite Reverse Proxy
+# Handles HTTPS auto-cert and routes traffic
+#
+# For production with a domain, replace :8080 with your domain:
+#   delirium.yourdomain.com {
+# Caddy will auto-provision HTTPS via Let's Encrypt.
+
+{$DELIRIUM_DOMAIN::8080} {
+    # API requests → Backend (FastAPI)
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # WebSocket → Backend
+    handle /ws/* {
+        reverse_proxy backend:8000
+    }
+
+    # Everything else → Frontend (Next.js)
+    handle {
+        reverse_proxy frontend:3000
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+
+    # Gzip compression
+    encode gzip
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+}

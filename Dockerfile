@@ -25,7 +25,6 @@ RUN groupadd -r delirium && useradd -r -g delirium delirium && \
 
 USER delirium
 
-ENV PORT=8000
-EXPOSE ${PORT}
+EXPOSE 8000
 
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT}
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

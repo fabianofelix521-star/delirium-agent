@@ -14,6 +14,9 @@ import {
   Loader2,
   Crown,
   Sparkles,
+  Database,
+  Github,
+  Mic,
 } from "lucide-react";
 
 const providers = [
@@ -79,11 +82,12 @@ const providers = [
     id: "groq",
     name: "Groq",
     icon: "⚡",
-    description: "Ultra-fast inference",
+    description: "Ultra-fast inference + Voice STT (Whisper)",
     models: [
       "llama-3.1-70b-versatile",
       "llama-3.1-8b-instant",
       "mixtral-8x7b-32768",
+      "whisper-large-v3-turbo",
     ],
     fields: [
       { key: "api_key", label: "API Key", default: "", type: "password" },
@@ -134,6 +138,65 @@ const providers = [
   },
 ];
 
+const integrations = [
+  {
+    id: "supabase",
+    name: "Supabase",
+    icon: "💚",
+    description: "Database, Auth, Storage, Edge Functions",
+    fields: [
+      {
+        key: "url",
+        label: "Project URL",
+        default: "https://xxx.supabase.co",
+        type: "url",
+      },
+      {
+        key: "anon_key",
+        label: "Anon / Public Key",
+        default: "",
+        type: "password",
+      },
+      {
+        key: "service_key",
+        label: "Service Role Key",
+        default: "",
+        type: "password",
+      },
+    ],
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    icon: "🐙",
+    description: "Repos, Issues, PRs, Code Search",
+    fields: [
+      {
+        key: "token",
+        label: "Personal Access Token",
+        default: "",
+        type: "password",
+      },
+      { key: "username", label: "Username", default: "", type: "text" },
+    ],
+  },
+  {
+    id: "elevenlabs",
+    name: "ElevenLabs",
+    icon: "🎙️",
+    description: "High-quality Text-to-Speech voices",
+    fields: [
+      { key: "api_key", label: "API Key", default: "", type: "password" },
+      {
+        key: "voice_id",
+        label: "Default Voice ID",
+        default: "21m00Tcm4TlvDq8ikWAM",
+        type: "text",
+      },
+    ],
+  },
+];
+
 export default function APIsPage() {
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [configs, setConfigs] = useState<
@@ -147,6 +210,15 @@ export default function APIsPage() {
     Record<string, "success" | "failed" | "testing">
   >({});
   const [saveSuccess, setSaveSuccess] = useState<Record<string, boolean>>({});
+
+  // Integration state
+  const [activeInteg, setActiveInteg] = useState<string | null>(null);
+  const [integConfigs, setIntegConfigs] = useState<
+    Record<string, Record<string, string>>
+  >({});
+  const [integSaveSuccess, setIntegSaveSuccess] = useState<
+    Record<string, boolean>
+  >({});
 
   // Load saved configs from localStorage
   useEffect(() => {
@@ -167,6 +239,18 @@ export default function APIsPage() {
       try {
         setEnabledProviders(new Set(JSON.parse(savedEnabled)));
       } catch {}
+
+    // Load integration configs
+    const loadedInteg: Record<string, Record<string, string>> = {};
+    integrations.forEach((i) => {
+      const saved = localStorage.getItem(`delirium_integ_${i.id}`);
+      if (saved)
+        try {
+          loadedInteg[i.id] = JSON.parse(saved);
+        } catch {}
+    });
+    if (Object.keys(loadedInteg).length > 0)
+      setIntegConfigs((prev) => ({ ...prev, ...loadedInteg }));
   }, []);
 
   const toggleProvider = (id: string) => {
@@ -209,6 +293,21 @@ export default function APIsPage() {
     setSaveSuccess((prev) => ({ ...prev, [id]: true }));
     setTimeout(
       () => setSaveSuccess((prev) => ({ ...prev, [id]: false })),
+      2000,
+    );
+  };
+
+  const saveIntegration = async (id: string) => {
+    const config = integConfigs[id] || {};
+    await fetch(`${API_BASE}/api/settings/`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: `integ_${id}`, settings: config }),
+    }).catch(() => {});
+    localStorage.setItem(`delirium_integ_${id}`, JSON.stringify(config));
+    setIntegSaveSuccess((prev) => ({ ...prev, [id]: true }));
+    setTimeout(
+      () => setIntegSaveSuccess((prev) => ({ ...prev, [id]: false })),
       2000,
     );
   };
@@ -443,6 +542,112 @@ export default function APIsPage() {
                           <Save size={13} />
                         )}
                         {saveSuccess[provider.id] ? "Saved!" : "Save"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Integrations */}
+      <div className="flex items-center gap-3 mt-8 mb-4">
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{ background: "rgba(16,185,129,0.1)" }}
+        >
+          <Plug size={18} style={{ color: "var(--accent-emerald, #10b981)" }} />
+        </div>
+        <div>
+          <h2
+            className="text-lg font-bold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Integrations
+          </h2>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Supabase, GitHub, Voice APIs
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3 stagger-children">
+        {integrations.map((integ) => {
+          const isExpanded = activeInteg === integ.id;
+          return (
+            <div key={integ.id} className="liquid-glass transition-all">
+              <div
+                className="flex items-center justify-between p-4 cursor-pointer relative z-10"
+                onClick={() => setActiveInteg(isExpanded ? null : integ.id)}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xl">{integ.icon}</span>
+                  <div className="min-w-0">
+                    <h3
+                      className="text-[13px] font-semibold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {integ.name}
+                    </h3>
+                    <p
+                      className="text-[11px] truncate"
+                      style={{ color: "var(--text-ghost)" }}
+                    >
+                      {integ.description}
+                    </p>
+                  </div>
+                </div>
+                {isExpanded ? (
+                  <ChevronUp size={14} style={{ color: "var(--text-ghost)" }} />
+                ) : (
+                  <ChevronDown size={14} style={{ color: "var(--text-ghost)" }} />
+                )}
+              </div>
+
+              {isExpanded && (
+                <div
+                  className="px-4 pb-4 animate-fade-in relative z-10"
+                  style={{ borderTop: "1px solid var(--glass-border)" }}
+                >
+                  <div className="pt-4 space-y-3">
+                    {integ.fields.map((field) => (
+                      <div key={field.key}>
+                        <label
+                          className="text-[11px] font-semibold mb-1.5 block"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {field.label}
+                        </label>
+                        <input
+                          type={field.type}
+                          placeholder={field.default || `Enter ${field.label.toLowerCase()}`}
+                          value={integConfigs[integ.id]?.[field.key] || ""}
+                          onChange={(e) =>
+                            setIntegConfigs((prev) => ({
+                              ...prev,
+                              [integ.id]: {
+                                ...prev[integ.id],
+                                [field.key]: e.target.value,
+                              },
+                            }))
+                          }
+                          className="input-glass w-full"
+                        />
+                      </div>
+                    ))}
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => saveIntegration(integ.id)}
+                        className="btn-primary flex items-center gap-1.5"
+                      >
+                        {integSaveSuccess[integ.id] ? (
+                          <Check size={13} />
+                        ) : (
+                          <Save size={13} />
+                        )}
+                        {integSaveSuccess[integ.id] ? "Saved!" : "Save"}
                       </button>
                     </div>
                   </div>

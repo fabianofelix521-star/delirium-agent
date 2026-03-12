@@ -268,3 +268,110 @@ async def tool_list_files(path: str = "", pattern: str = "*") -> str:
 async def tool_git(args: str) -> str:
     """Execute a git command."""
     return await tool_shell(f"git {args}")
+
+
+# ── Supabase Tools ───────────────────────────────────────
+
+@tool(
+    "supabase_query",
+    "Query a Supabase database table (select, insert, update, delete)",
+    {
+        "table": "string (table name)",
+        "method": "string (GET, POST, PATCH, DELETE)",
+        "params": "object (optional query params, e.g. {'select': '*', 'id': 'eq.5'})",
+        "body": "object (optional, for POST/PATCH)",
+    },
+)
+async def tool_supabase_query(table: str, method: str = "GET", params: dict | None = None, body: dict | None = None) -> str:
+    from integrations.supabase_client import supabase_query
+    result = await supabase_query(table, method, params, body)
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+@tool(
+    "supabase_rpc",
+    "Call a Supabase RPC / Edge Function",
+    {"function_name": "string", "params": "object (optional)"},
+)
+async def tool_supabase_rpc(function_name: str, params: dict | None = None) -> str:
+    from integrations.supabase_client import supabase_rpc
+    result = await supabase_rpc(function_name, params)
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+@tool(
+    "supabase_storage",
+    "List files in a Supabase storage bucket",
+    {"bucket": "string (bucket name)", "prefix": "string (optional folder prefix)"},
+)
+async def tool_supabase_storage(bucket: str, prefix: str = "") -> str:
+    from integrations.supabase_client import supabase_storage_list
+    result = await supabase_storage_list(bucket, prefix)
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+# ── GitHub Tools ─────────────────────────────────────────
+
+@tool(
+    "github_repos",
+    "List your GitHub repositories",
+    {"per_page": "integer (optional, default 30)"},
+)
+async def tool_github_repos(per_page: int = 30) -> str:
+    from integrations.github_client import github_list_repos
+    result = await github_list_repos(per_page)
+    if "data" in result and isinstance(result["data"], list):
+        repos = [{"name": r["full_name"], "url": r["html_url"], "stars": r.get("stargazers_count", 0)} for r in result["data"]]
+        return json.dumps(repos, ensure_ascii=False)
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+@tool(
+    "github_create_repo",
+    "Create a new GitHub repository",
+    {"name": "string", "description": "string (optional)", "private": "boolean (optional, default false)"},
+)
+async def tool_github_create_repo(name: str, description: str = "", private: bool = False) -> str:
+    from integrations.github_client import github_create_repo
+    result = await github_create_repo(name, description, private)
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+@tool(
+    "github_read_file",
+    "Read a file from a GitHub repository",
+    {"owner": "string", "repo": "string", "path": "string", "ref": "string (optional, default 'main')"},
+)
+async def tool_github_read_file(owner: str, repo: str, path: str, ref: str = "main") -> str:
+    from integrations.github_client import github_get_file
+    import base64
+    result = await github_get_file(owner, repo, path, ref)
+    if "data" in result and isinstance(result["data"], dict) and "content" in result["data"]:
+        content = base64.b64decode(result["data"]["content"]).decode(errors="replace")
+        return content
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+@tool(
+    "github_issues",
+    "List issues for a GitHub repository",
+    {"owner": "string", "repo": "string", "state": "string (optional: open, closed, all)"},
+)
+async def tool_github_issues(owner: str, repo: str, state: str = "open") -> str:
+    from integrations.github_client import github_list_issues
+    result = await github_list_issues(owner, repo, state)
+    if "data" in result and isinstance(result["data"], list):
+        issues = [{"number": i["number"], "title": i["title"], "state": i["state"], "url": i["html_url"]} for i in result["data"]]
+        return json.dumps(issues, ensure_ascii=False)
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+@tool(
+    "github_create_issue",
+    "Create an issue on a GitHub repository",
+    {"owner": "string", "repo": "string", "title": "string", "body": "string (optional)"},
+)
+async def tool_github_create_issue(owner: str, repo: str, title: str, body: str = "") -> str:
+    from integrations.github_client import github_create_issue
+    result = await github_create_issue(owner, repo, title, body)
+    return json.dumps(result, ensure_ascii=False, default=str)

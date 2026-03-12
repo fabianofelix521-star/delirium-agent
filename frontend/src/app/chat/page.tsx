@@ -68,6 +68,7 @@ export default function ChatPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const sendVoiceMessageRef = useRef<(text: string) => void>(undefined);
 
   // Load existing conversation from URL param
   const loadConversation = useCallback((id: string) => {
@@ -159,21 +160,35 @@ export default function ChatPage() {
       formData.append("engine", "edge_tts");
       formData.append("voice", "pt-BR-AntonioNeural");
       formData.append("speed", "1.0");
-      const resp = await fetch(`${API_BASE}/api/voice/tts`, { method: "POST", body: formData });
+      const resp = await fetch(`${API_BASE}/api/voice/tts`, {
+        method: "POST",
+        body: formData,
+      });
       if (!resp.ok) return;
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       ttsAudioRef.current = audio;
       setIsSpeaking(true);
-      audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
-      audio.onerror = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(url);
+      };
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(url);
+      };
       await audio.play();
-    } catch { setIsSpeaking(false); }
+    } catch {
+      setIsSpeaking(false);
+    }
   }, []);
 
   const stopTTS = useCallback(() => {
-    if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; }
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
+    }
     setIsSpeaking(false);
   }, []);
 
@@ -181,9 +196,13 @@ export default function ChatPage() {
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm",
+      });
       audioChunksRef.current = [];
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
@@ -195,7 +214,10 @@ export default function ChatPage() {
           fd.append("audio", blob, "recording.webm");
           fd.append("engine", "groq_whisper");
           fd.append("language", "pt");
-          const resp = await fetch(`${API_BASE}/api/voice/stt`, { method: "POST", body: fd });
+          const resp = await fetch(`${API_BASE}/api/voice/stt`, {
+            method: "POST",
+            body: fd,
+          });
           if (resp.ok) {
             const data = await resp.json();
             const text = data.text?.trim() || "";
@@ -204,11 +226,13 @@ export default function ChatPage() {
               // Auto-send after a short delay so user sees what was transcribed
               setTimeout(() => {
                 setInput("");
-                sendVoiceMessage(text);
+                sendVoiceMessageRef.current?.(text);
               }, 400);
             }
           }
-        } catch { /* silent */ }
+        } catch {
+          /* silent */
+        }
         setIsTranscribing(false);
       };
       mediaRecorderRef.current = mediaRecorder;
@@ -221,61 +245,106 @@ export default function ChatPage() {
   }, []);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+    if (mediaRecorderRef.current?.state === "recording")
+      mediaRecorderRef.current.stop();
     setIsRecording(false);
   }, []);
 
   // ─── Voice: Send transcribed message (reuses handleSend logic with TTS) ───
-  const sendVoiceMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isStreaming) return;
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: text, timestamp: Date.now() };
-    setMessages((prev) => [...prev, userMsg]);
-    setIsStreaming(true);
+  const sendVoiceMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isStreaming) return;
+      const userMsg: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: text,
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      setIsStreaming(true);
 
-    const assistantMsg: Message = {
-      id: (Date.now() + 1).toString(), role: "assistant", content: "", timestamp: Date.now(),
-      steps: [{ id: "s1", type: "thinking", label: "Analyzing...", status: "running" }],
-    };
-    setMessages((prev) => [...prev, assistantMsg]);
+      const assistantMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+        steps: [
+          {
+            id: "s1",
+            type: "thinking",
+            label: "Analyzing...",
+            status: "running",
+          },
+        ],
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
 
-    try {
-      const res = await fetch(`${API_BASE}/api/chat/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, conversation_id: conversationId || undefined, stream: true, provider: activeProvider, model: activeModel }),
-      });
-      if (res.ok && res.body) {
-        setMessages((prev) => { const u = [...prev]; const l = u[u.length - 1]; if (l.steps) l.steps[0].status = "done"; return u; });
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let fullResp = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const d = JSON.parse(line.slice(6));
-                if (d.type === "start" && d.conversation_id) setConversationId(d.conversation_id);
-                if (d.type === "token") {
-                  fullResp += d.content;
-                  setMessages((prev) => { const u = [...prev]; const l = u[u.length - 1]; if (l.role === "assistant") l.content = fullResp; return u; });
+      try {
+        const res = await fetch(`${API_BASE}/api/chat/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            conversation_id: conversationId || undefined,
+            stream: true,
+            provider: activeProvider,
+            model: activeModel,
+          }),
+        });
+        if (res.ok && res.body) {
+          setMessages((prev) => {
+            const u = [...prev];
+            const l = u[u.length - 1];
+            if (l.steps) l.steps[0].status = "done";
+            return u;
+          });
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let fullResp = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                try {
+                  const d = JSON.parse(line.slice(6));
+                  if (d.type === "start" && d.conversation_id)
+                    setConversationId(d.conversation_id);
+                  if (d.type === "token") {
+                    fullResp += d.content;
+                    setMessages((prev) => {
+                      const u = [...prev];
+                      const l = u[u.length - 1];
+                      if (l.role === "assistant") l.content = fullResp;
+                      return u;
+                    });
+                  }
+                } catch {
+                  /* skip */
                 }
-              } catch { /* skip */ }
+              }
             }
           }
+          // Auto-play TTS for voice messages
+          if (fullResp) playTTS(fullResp);
         }
-        // Auto-play TTS for voice messages
-        if (fullResp && voiceEnabled) playTTS(fullResp);
+      } catch {
+        /* silent */
       }
-    } catch { /* silent */ }
-    window.dispatchEvent(new Event("delirium-conversation-update"));
-    setIsStreaming(false);
-  }, [isStreaming, conversationId, activeProvider, activeModel, voiceEnabled, playTTS]);
+      window.dispatchEvent(new Event("delirium-conversation-update"));
+      setIsStreaming(false);
+    },
+    [isStreaming, conversationId, activeProvider, activeModel, playTTS],
+  );
+
+  // Keep ref in sync so startRecording always calls current version
+  useEffect(() => {
+    sendVoiceMessageRef.current = sendVoiceMessage;
+  }, [sendVoiceMessage]);
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
@@ -814,10 +883,20 @@ export default function ChatPage() {
                       ? "var(--bg-elevated)"
                       : "var(--bg-elevated)",
                   color: isRecording ? "white" : "var(--text-ghost)",
-                  border: isRecording ? "none" : "1px solid var(--glass-border)",
-                  boxShadow: isRecording ? "0 2px 12px rgba(239,68,68,0.3)" : "none",
+                  border: isRecording
+                    ? "none"
+                    : "1px solid var(--glass-border)",
+                  boxShadow: isRecording
+                    ? "0 2px 12px rgba(239,68,68,0.3)"
+                    : "none",
                 }}
-                title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Voice message"}
+                title={
+                  isRecording
+                    ? "Stop recording"
+                    : isTranscribing
+                      ? "Transcribing..."
+                      : "Voice message"
+                }
               >
                 {isTranscribing ? (
                   <Loader2 size={15} className="animate-spin" />
@@ -832,7 +911,10 @@ export default function ChatPage() {
                 <button
                   onClick={stopTTS}
                   className="w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0"
-                  style={{ background: "rgba(139,92,246,0.15)", color: "var(--accent-violet)" }}
+                  style={{
+                    background: "rgba(139,92,246,0.15)",
+                    color: "var(--accent-violet)",
+                  }}
                   title="Stop speaking"
                 >
                   <VolumeX size={15} />

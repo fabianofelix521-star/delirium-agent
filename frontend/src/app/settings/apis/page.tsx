@@ -124,6 +124,24 @@ const providers = [
     ],
   },
   {
+    id: "openrouter",
+    name: "OpenRouter",
+    icon: "🌐",
+    description: "200+ models: Claude, GPT-4o, Gemini, Llama, DeepSeek",
+    models: [
+      "anthropic/claude-sonnet-4", "anthropic/claude-4-opus",
+      "openai/gpt-4o", "openai/o1-preview",
+      "google/gemini-2.5-pro", "google/gemini-2.0-flash",
+      "meta-llama/llama-4-maverick", "meta-llama/llama-3.1-405b",
+      "deepseek/deepseek-r1", "mistralai/mistral-large",
+      "qwen/qwen3-coder", "cohere/command-r-plus",
+    ],
+    fields: [
+      { key: "api_key", label: "API Key", default: "", type: "password" },
+      { key: "custom_models", label: "Custom Models (one per line)", default: "", type: "textarea" },
+    ],
+  },
+  {
     id: "custom",
     name: "Custom API",
     icon: "🔧",
@@ -488,24 +506,46 @@ export default function APIsPage() {
                         >
                           {field.label}
                         </label>
-                        <input
-                          type={field.type}
-                          placeholder={
-                            field.default ||
-                            `Enter ${field.label.toLowerCase()}`
-                          }
-                          value={configs[provider.id]?.[field.key] || ""}
-                          onChange={(e) =>
-                            setConfigs((prev) => ({
-                              ...prev,
-                              [provider.id]: {
-                                ...prev[provider.id],
-                                [field.key]: e.target.value,
-                              },
-                            }))
-                          }
-                          className="input-glass w-full"
-                        />
+                        {field.type === "textarea" ? (
+                          <textarea
+                            placeholder={
+                              field.default ||
+                              `Enter ${field.label.toLowerCase()}`
+                            }
+                            value={configs[provider.id]?.[field.key] || ""}
+                            onChange={(e) =>
+                              setConfigs((prev) => ({
+                                ...prev,
+                                [provider.id]: {
+                                  ...prev[provider.id],
+                                  [field.key]: e.target.value,
+                                },
+                              }))
+                            }
+                            rows={4}
+                            className="input-glass w-full resize-y text-[11px]"
+                            style={{ fontFamily: "monospace" }}
+                          />
+                        ) : (
+                          <input
+                            type={field.type}
+                            placeholder={
+                              field.default ||
+                              `Enter ${field.label.toLowerCase()}`
+                            }
+                            value={configs[provider.id]?.[field.key] || ""}
+                            onChange={(e) =>
+                              setConfigs((prev) => ({
+                                ...prev,
+                                [provider.id]: {
+                                  ...prev[provider.id],
+                                  [field.key]: e.target.value,
+                                },
+                              }))
+                            }
+                            className="input-glass w-full"
+                          />
+                        )}
                       </div>
                     ))}
                     {provider.models.length > 0 && (

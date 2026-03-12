@@ -67,6 +67,24 @@ class LLMRouter:
                 "glm-5", "kimi-k2.5", "MiniMax-M2.5",
             ]
 
+        # OpenRouter (200+ models gateway)
+        if key := os.getenv("OPENROUTER_API_KEY"):
+            self.providers["openrouter"] = CustomProvider(
+                api_key=key,
+                base_url="https://openrouter.ai/api/v1",
+                default_model=os.getenv("OPENROUTER_DEFAULT_MODEL", "anthropic/claude-sonnet-4"),
+                provider_name="OpenRouter",
+                custom_headers={"HTTP-Referer": os.getenv("APP_URL", "http://localhost:3000")},
+            )
+            self.providers["openrouter"].models = [
+                "anthropic/claude-sonnet-4", "anthropic/claude-4-opus",
+                "openai/gpt-4o", "openai/o1-preview",
+                "google/gemini-2.5-pro", "google/gemini-2.0-flash",
+                "meta-llama/llama-4-maverick", "meta-llama/llama-3.1-405b",
+                "deepseek/deepseek-r1", "mistralai/mistral-large",
+                "qwen/qwen3-coder", "cohere/command-r-plus",
+            ]
+
         # Custom OpenAI-compatible
         if url := os.getenv("CUSTOM_API_BASE_URL"):
             self.providers["custom"] = CustomProvider(
@@ -78,7 +96,7 @@ class LLMRouter:
 
         # Set default and fallback
         self.default_provider = os.getenv("DEFAULT_PROVIDER", "alibaba")
-        self.fallback_order = [p for p in ["alibaba", "groq", "openai", "anthropic", "google", "custom"] if p in self.providers]
+        self.fallback_order = [p for p in ["alibaba", "openrouter", "groq", "openai", "anthropic", "google", "custom"] if p in self.providers]
 
     def get_provider(self, name: str | None = None) -> BaseProvider:
         """Get a specific provider or the default one."""

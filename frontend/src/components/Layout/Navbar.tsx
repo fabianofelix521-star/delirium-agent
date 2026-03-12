@@ -30,6 +30,7 @@ const PROVIDER_ICONS: Record<string, string> = {
   anthropic: "🟣",
   google: "🔵",
   groq: "⚡",
+  openrouter: "🌐",
   custom: "🔧",
 };
 
@@ -47,12 +48,24 @@ export function Navbar() {
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
+  const [providerOpen, setProviderOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [models, setModels] = useState<ModelEntry[]>(fallbackModels);
   const [selectedModel, setSelectedModel] = useState<ModelEntry>(
     fallbackModels[0],
   );
+
+  // Unique providers derived from models
+  const uniqueProviders = models.reduce<{ key: string; name: string; icon: string }[]>((acc, m) => {
+    if (!acc.find((p) => p.key === m.providerKey)) {
+      acc.push({ key: m.providerKey, name: m.provider, icon: m.icon });
+    }
+    return acc;
+  }, []);
+
+  // Models filtered by selected provider
+  const filteredModels = models.filter((m) => m.providerKey === selectedModel.providerKey);
 
   // Fetch providers/models from backend
   useEffect(() => {
@@ -152,84 +165,150 @@ export function Navbar() {
           {pageTitle()}
         </h2>
 
-        {/* Model selector (only on chat) */}
+        {/* Provider + Model selectors (only on chat) */}
         {isChat && (
-          <div className="relative">
-            <button
-              className="model-selector"
-              onClick={() => setModelOpen(!modelOpen)}
-            >
-              <span>{selectedModel.icon}</span>
-              <span className="hidden sm:inline">{selectedModel.name}</span>
-              <ChevronDown
-                size={12}
-                className={`transition-transform ${modelOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-
-            {modelOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setModelOpen(false)}
+          <div className="flex items-center gap-1.5">
+            {/* Provider selector */}
+            <div className="relative">
+              <button
+                className="model-selector"
+                onClick={() => { setProviderOpen(!providerOpen); setModelOpen(false); }}
+              >
+                <span>{selectedModel.icon}</span>
+                <span className="hidden sm:inline text-[11px]">{selectedModel.provider}</span>
+                <ChevronDown
+                  size={11}
+                  className={`transition-transform ${providerOpen ? "rotate-180" : ""}`}
                 />
-                <div className="absolute top-full left-0 mt-2 dropdown-menu z-50 animate-fade-in-scale w-[calc(100vw-2rem)] sm:w-64 max-w-64">
-                  <p
-                    className="text-[10px] uppercase tracking-widest font-semibold px-3 py-2"
-                    style={{ color: "var(--text-ghost)" }}
-                  >
-                    Select Model
-                  </p>
-                  {models.map((model) => (
-                    <button
-                      key={model.id}
-                      className="dropdown-item w-full text-left"
-                      onClick={() => {
-                        setSelectedModel(model);
-                        setModelOpen(false);
-                        localStorage.setItem(
-                          "delirium_selected_model",
-                          model.id,
-                        );
-                        window.dispatchEvent(
-                          new CustomEvent("delirium-model-change", {
-                            detail: model,
-                          }),
-                        );
-                      }}
-                      style={{
-                        background:
-                          selectedModel.id === model.id
-                            ? "rgba(99,102,241,0.08)"
-                            : undefined,
-                      }}
+              </button>
+
+              {providerOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setProviderOpen(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-2 dropdown-menu z-50 animate-fade-in-scale w-[calc(100vw-2rem)] sm:w-52 max-w-52">
+                    <p
+                      className="text-[10px] uppercase tracking-widest font-semibold px-3 py-2"
+                      style={{ color: "var(--text-ghost)" }}
                     >
-                      <span className="text-base">{model.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className="text-[12px] font-medium truncate"
+                      Provider
+                    </p>
+                    {uniqueProviders.map((prov) => (
+                      <button
+                        key={prov.key}
+                        className="dropdown-item w-full text-left"
+                        onClick={() => {
+                          // Switch to first model of this provider
+                          const firstModel = models.find((m) => m.providerKey === prov.key);
+                          if (firstModel) {
+                            setSelectedModel(firstModel);
+                            localStorage.setItem("delirium_selected_model", firstModel.id);
+                            window.dispatchEvent(
+                              new CustomEvent("delirium-model-change", { detail: firstModel }),
+                            );
+                          }
+                          setProviderOpen(false);
+                        }}
+                        style={{
+                          background:
+                            selectedModel.providerKey === prov.key
+                              ? "rgba(99,102,241,0.08)"
+                              : undefined,
+                        }}
+                      >
+                        <span className="text-base">{prov.icon}</span>
+                        <span
+                          className="flex-1 text-[12px] font-medium"
                           style={{ color: "var(--text-primary)" }}
                         >
-                          {model.name}
-                        </p>
-                        <p
-                          className="text-[10px]"
-                          style={{ color: "var(--text-ghost)" }}
-                        >
-                          {model.provider}
-                        </p>
-                      </div>
-                      {selectedModel.id === model.id && (
-                        <Sparkles
-                          size={12}
-                          style={{ color: "var(--accent-indigo)" }}
-                        />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+                          {prov.name}
+                        </span>
+                        {selectedModel.providerKey === prov.key && (
+                          <Sparkles
+                            size={12}
+                            style={{ color: "var(--accent-indigo)" }}
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Model selector (filtered by provider) */}
+            <div className="relative">
+              <button
+                className="model-selector"
+                onClick={() => { setModelOpen(!modelOpen); setProviderOpen(false); }}
+              >
+                <span className="hidden sm:inline text-[11px]">{selectedModel.name}</span>
+                <span className="sm:hidden text-[11px]">{selectedModel.name.length > 16 ? selectedModel.name.slice(0, 16) + "…" : selectedModel.name}</span>
+                <ChevronDown
+                  size={11}
+                  className={`transition-transform ${modelOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {modelOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setModelOpen(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-2 dropdown-menu z-50 animate-fade-in-scale w-[calc(100vw-2rem)] sm:w-64 max-w-64">
+                    <p
+                      className="text-[10px] uppercase tracking-widest font-semibold px-3 py-2"
+                      style={{ color: "var(--text-ghost)" }}
+                    >
+                      {selectedModel.provider} Models
+                    </p>
+                    {filteredModels.map((model) => (
+                      <button
+                        key={model.id}
+                        className="dropdown-item w-full text-left"
+                        onClick={() => {
+                          setSelectedModel(model);
+                          setModelOpen(false);
+                          localStorage.setItem(
+                            "delirium_selected_model",
+                            model.id,
+                          );
+                          window.dispatchEvent(
+                            new CustomEvent("delirium-model-change", {
+                              detail: model,
+                            }),
+                          );
+                        }}
+                        style={{
+                          background:
+                            selectedModel.id === model.id
+                              ? "rgba(99,102,241,0.08)"
+                              : undefined,
+                        }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className="text-[12px] font-medium truncate"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {model.name}
+                          </p>
+                        </div>
+                        {selectedModel.id === model.id && (
+                          <Sparkles
+                            size={12}
+                            style={{ color: "var(--accent-indigo)" }}
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

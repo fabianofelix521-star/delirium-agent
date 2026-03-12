@@ -70,7 +70,18 @@ async def update_settings(update: SettingsUpdate) -> dict:
 @router.get("/providers/list")
 async def list_providers() -> list[dict]:
     """List all configured LLM providers."""
-    return llm_router.list_providers()
+    result = llm_router.list_providers()
+    # Merge custom models from settings into openrouter
+    custom_models_str = _settings.get("provider_openrouter", {}).get("custom_models", "")
+    if custom_models_str:
+        custom = [m.strip() for m in custom_models_str.splitlines() if m.strip()]
+        for entry in result:
+            if entry["name"] == "openrouter" and custom:
+                existing = set(entry["models"])
+                for m in custom:
+                    if m not in existing:
+                        entry["models"].append(m)
+    return result
 
 
 @router.post("/providers/test/{provider_name}")

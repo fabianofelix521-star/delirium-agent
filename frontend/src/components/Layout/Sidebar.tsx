@@ -21,13 +21,11 @@ import {
   Trash2,
   Zap,
   Code2,
-  Monitor,
 } from "lucide-react";
 
 const navItems = [
   { href: "/chat", label: "Chat", icon: MessageCircle },
   { href: "/code", label: "Code", icon: Code2 },
-  { href: "/preview", label: "Preview", icon: Monitor },
   { href: "/tools", label: "Tools", icon: Wrench },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },

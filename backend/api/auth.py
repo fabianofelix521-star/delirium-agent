@@ -25,7 +25,7 @@ EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "24"))
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "fabianofelix21@gmail.com")
 ADMIN_PASSWORD_HASH = os.getenv(
     "ADMIN_PASSWORD_HASH",
-    "$2b$12$Mv6EWLnNg7peTrs/XdaHIOabv739ArgEAkEA6K3uop08DHGMA/uCG",
+    "$2b$12$M5swDgvaIcnV1R6eZe965.fDpitJ75H7tegt4ZIh6lqyYgKfhR7ne",
 )
 
 

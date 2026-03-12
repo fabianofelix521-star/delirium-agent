@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 import {
@@ -45,7 +45,7 @@ interface Message {
   steps?: AgentStep[];
 }
 
-export default function ChatPage() {
+function ChatPageInner() {
   const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -69,6 +69,8 @@ export default function ChatPage() {
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const sendVoiceMessageRef = useRef<(text: string) => void>(undefined);
+  const [activeModes, setActiveModes] = useState<Set<string>>(new Set());
+  const suggestionTextRef = useRef<string>("");
 
   // Load existing conversation from URL param
   const loadConversation = useCallback((id: string) => {
@@ -280,11 +282,15 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, assistantMsg]);
 
       try {
+        const modePrefix =
+          activeModes.size > 0
+            ? `[Active modes: ${Array.from(activeModes).join(", ")}] `
+            : "";
         const res = await fetch(`${API_BASE}/api/chat/send`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: text,
+            message: modePrefix + text,
             conversation_id: conversationId || undefined,
             stream: true,
             provider: activeProvider,
@@ -338,7 +344,14 @@ export default function ChatPage() {
       window.dispatchEvent(new Event("delirium-conversation-update"));
       setIsStreaming(false);
     },
-    [isStreaming, conversationId, activeProvider, activeModel, playTTS],
+    [
+      isStreaming,
+      conversationId,
+      activeProvider,
+      activeModel,
+      playTTS,
+      activeModes,
+    ],
   );
 
   // Keep ref in sync so startRecording always calls current version
@@ -346,13 +359,13 @@ export default function ChatPage() {
     sendVoiceMessageRef.current = sendVoiceMessage;
   }, [sendVoiceMessage]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
+  const handleSendDirect = async (text: string) => {
+    if (!text.trim() || isStreaming) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: text.trim(),
       timestamp: Date.now(),
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -380,11 +393,15 @@ export default function ChatPage() {
     setShowSteps((prev) => ({ ...prev, [assistantMsg.id]: true }));
 
     try {
+      const modePrefix =
+        activeModes.size > 0
+          ? `[Active modes: ${Array.from(activeModes).join(", ")}] `
+          : "";
       const res = await fetch(`${API_BASE}/api/chat/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: userMsg.content,
+          message: modePrefix + text.trim(),
           conversation_id: conversationId || undefined,
           stream: true,
           provider: activeProvider,
@@ -393,7 +410,6 @@ export default function ChatPage() {
       });
 
       if (res.ok && res.body) {
-        // Mark thinking as done, start streaming
         setMessages((prev) => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
@@ -404,6 +420,7 @@ export default function ChatPage() {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let fullResp = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -419,10 +436,11 @@ export default function ChatPage() {
                   setConversationId(data.conversation_id);
                 }
                 if (data.type === "token") {
+                  fullResp += data.content;
                   setMessages((prev) => {
                     const updated = [...prev];
                     const last = updated[updated.length - 1];
-                    if (last.role === "assistant") last.content += data.content;
+                    if (last.role === "assistant") last.content = fullResp;
                     return updated;
                   });
                 }
@@ -432,8 +450,8 @@ export default function ChatPage() {
             }
           }
         }
+        if (voiceEnabled && fullResp) playTTS(fullResp);
       } else {
-        // No backend connection fallback
         setMessages((prev) => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
@@ -460,6 +478,11 @@ export default function ChatPage() {
       window.dispatchEvent(new Event("delirium-conversation-update"));
       setIsStreaming(false);
     }
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || isStreaming) return;
+    await handleSendDirect(input);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -521,36 +544,51 @@ export default function ChatPage() {
   const suggestions = [
     {
       icon: Code,
-      text: "Write a Python script",
+      text: "Write a Python script to scrape a website",
       desc: "Code execution",
       color: "#6366f1",
     },
     {
       icon: Globe,
-      text: "Search the web",
+      text: "Search the web for the latest AI news",
       desc: "Web browsing",
       color: "#06b6d4",
     },
     {
       icon: BarChart3,
-      text: "Analyze this data",
+      text: "Analyze and visualize data from a CSV file",
       desc: "Data analysis",
       color: "#8b5cf6",
     },
-    { icon: Bug, text: "Fix this error", desc: "Debugging", color: "#ec4899" },
+    {
+      icon: Bug,
+      text: "Debug and fix this error in my code",
+      desc: "Debugging",
+      color: "#ec4899",
+    },
     {
       icon: Terminal,
-      text: "Run a command",
+      text: "Run shell commands to set up a project",
       desc: "Shell access",
       color: "#10b981",
     },
     {
       icon: FileText,
-      text: "Read and edit files",
+      text: "Create a full project structure with files",
       desc: "File operations",
       color: "#f59e0b",
     },
   ];
+
+  const handleSuggestionClick = (text: string) => {
+    setInput(text);
+    // Use ref to pass text directly since state won't be updated yet
+    suggestionTextRef.current = text;
+    requestAnimationFrame(() => {
+      handleSendDirect(suggestionTextRef.current);
+      suggestionTextRef.current = "";
+    });
+  };
 
   return (
     <div className="flex h-full relative">
@@ -604,7 +642,7 @@ export default function ChatPage() {
                   return (
                     <button
                       key={i}
-                      onClick={() => setInput(s.text + "...")}
+                      onClick={() => handleSuggestionClick(s.text)}
                       className="liquid-glass liquid-glass-hover p-3.5 text-left transition-all group"
                     >
                       <div className="flex items-center gap-2.5 relative z-10">
@@ -951,16 +989,54 @@ export default function ChatPage() {
                 { icon: Terminal, label: "Shell" },
               ].map((cap) => {
                 const Icon = cap.icon;
+                const isActive = activeModes.has(cap.label);
                 return (
                   <button
                     key={cap.label}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all hover:bg-white/[0.03]"
-                    style={{ color: "var(--text-ghost)" }}
+                    onClick={() =>
+                      setActiveModes((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(cap.label)) next.delete(cap.label);
+                        else next.add(cap.label);
+                        return next;
+                      })
+                    }
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${isActive ? "" : "hover:bg-white/[0.03]"}`}
+                    style={{
+                      color: isActive
+                        ? "var(--accent-indigo)"
+                        : "var(--text-ghost)",
+                      background: isActive
+                        ? "rgba(99,102,241,0.1)"
+                        : "transparent",
+                      border: isActive
+                        ? "1px solid rgba(99,102,241,0.2)"
+                        : "1px solid transparent",
+                    }}
                   >
                     <Icon size={11} /> {cap.label}
                   </button>
                 );
               })}
+              <button
+                onClick={() => setVoiceEnabled((v) => !v)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${voiceEnabled ? "" : "hover:bg-white/[0.03]"}`}
+                style={{
+                  color: voiceEnabled
+                    ? "var(--accent-violet)"
+                    : "var(--text-ghost)",
+                  background: voiceEnabled
+                    ? "rgba(139,92,246,0.1)"
+                    : "transparent",
+                  border: voiceEnabled
+                    ? "1px solid rgba(139,92,246,0.2)"
+                    : "1px solid transparent",
+                }}
+                title={voiceEnabled ? "Disable auto TTS" : "Enable auto TTS"}
+              >
+                {voiceEnabled ? <Volume2 size={11} /> : <VolumeX size={11} />}
+                {voiceEnabled ? "TTS On" : "TTS"}
+              </button>
               <div className="flex-1" />
               <span
                 className="hidden md:inline text-[10px] font-medium"
@@ -973,5 +1049,28 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="flex-1 flex items-center justify-center"
+          style={{ background: "var(--bg-void)" }}
+        >
+          <div
+            className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
+            style={{
+              borderColor: "var(--accent-primary)",
+              borderTopColor: "transparent",
+            }}
+          />
+        </div>
+      }
+    >
+      <ChatPageInner />
+    </Suspense>
   );
 }

@@ -21,15 +21,20 @@ const PRESETS = [
 const STORAGE_KEY = "delirium_preview_url";
 
 export default function PreviewPage() {
-  const [url, setUrl] = useState(() => {
-    if (typeof window === "undefined") return "http://localhost:3001";
-    return localStorage.getItem(STORAGE_KEY) || "http://localhost:3001";
-  });
-  const [inputUrl, setInputUrl] = useState(url);
+  const [url, setUrl] = useState("http://localhost:3001");
+  const [inputUrl, setInputUrl] = useState("http://localhost:3001");
   const [device, setDevice] = useState(0);
   const [key, setKey] = useState(0);
   const [showPresets, setShowPresets] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      setUrl(saved);
+      setInputUrl(saved);
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, url);

@@ -28,6 +28,7 @@ from api.routes.integrations import router as integrations_router
 from api.routes.system import router as system_router
 from api.routes.voice import router as voice_router
 from api.routes.github import router as github_router
+from api.routes.mcp import router as mcp_router
 
 
 @asynccontextmanager
@@ -65,6 +66,7 @@ app.include_router(integrations_router, prefix="/api/integrations", tags=["integ
 app.include_router(system_router, prefix="/api/system", tags=["system"])
 app.include_router(voice_router, prefix="/api/voice", tags=["voice"])
 app.include_router(github_router, prefix="/api/github", tags=["github"])
+app.include_router(mcp_router, prefix="/api/mcp", tags=["mcp"])
 
 
 # ─── Health Check ────────────────────────────────────────

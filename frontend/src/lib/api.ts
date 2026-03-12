@@ -1,5 +1,4 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_BASE = "";
 
 export async function apiFetch<T>(
   path: string,
@@ -83,6 +82,7 @@ export async function* streamChat(
 }
 
 export function getWsUrl(): string {
-  const base = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
-  return base;
+  if (typeof window === "undefined") return "ws://localhost:8000";
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${window.location.host}`;
 }

@@ -375,3 +375,136 @@ async def tool_github_create_issue(owner: str, repo: str, title: str, body: str 
     from integrations.github_client import github_create_issue
     result = await github_create_issue(owner, repo, title, body)
     return json.dumps(result, ensure_ascii=False, default=str)
+
+
+# ── Advanced Tools ───────────────────────────────────────
+
+@tool(
+    "search_files",
+    "Recursively search for text/regex in files under a directory",
+    {"path": "string (directory, default workspace)", "pattern": "string (text or regex to search)", "glob": "string (optional file glob, e.g. '*.py')"},
+)
+async def tool_search_files(pattern: str, path: str = "", glob: str = "*") -> str:
+    """Grep-like recursive search across files."""
+    p = Path(path) if (path and os.path.isabs(path)) else Path(WORKSPACE) / (path or "")
+    if not p.exists():
+        return f"ERROR: Directory not found: {p}"
+    matches: list[str] = []
+    compiled = re.compile(pattern, re.IGNORECASE)
+    for fpath in sorted(p.rglob(glob)):
+        if fpath.is_file() and fpath.stat().st_size < 500_000:
+            try:
+                text = fpath.read_text(errors="replace")
+                for i, line in enumerate(text.splitlines(), 1):
+                    if compiled.search(line):
+                        matches.append(f"{fpath.relative_to(p)}:{i}: {line.strip()[:150]}")
+                        if len(matches) >= 100:
+                            return "\n".join(matches) + "\n... (100 matches limit)"
+            except (OSError, UnicodeDecodeError):
+                continue
+    return "\n".join(matches) if matches else "No matches found."
+
+
+@tool(
+    "http_request",
+    "Make an HTTP request (GET, POST, PUT, DELETE) to any API endpoint",
+    {"method": "string (GET/POST/PUT/DELETE)", "url": "string", "headers": "object (optional)", "body": "object or string (optional)"},
+)
+async def tool_http_request(url: str, method: str = "GET", headers: dict | None = None, body: Any = None) -> str:
+    """Make HTTP requests to external APIs."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return "ERROR: Only http/https URLs are allowed"
+    hostname = parsed.hostname or ""
+    if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "::1") or hostname.endswith(".internal") or hostname.endswith(".local"):
+        return "ERROR: Access to internal network addresses is blocked"
+    req_headers = {"User-Agent": "Delirium/1.0"}
+    if headers:
+        req_headers.update(headers)
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+        if method.upper() == "GET":
+            resp = await client.get(url, headers=req_headers)
+        elif method.upper() == "POST":
+            resp = await client.post(url, headers=req_headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
+        elif method.upper() == "PUT":
+            resp = await client.put(url, headers=req_headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
+        elif method.upper() == "DELETE":
+            resp = await client.delete(url, headers=req_headers)
+        else:
+            return f"ERROR: Unsupported method: {method}"
+    result = f"Status: {resp.status_code}\n"
+    ct = resp.headers.get("content-type", "")
+    if "json" in ct:
+        try:
+            result += json.dumps(resp.json(), indent=2, ensure_ascii=False)[:6000]
+        except Exception:
+            result += resp.text[:6000]
+    else:
+        result += resp.text[:6000]
+    return result
+
+
+@tool(
+    "install_package",
+    "Install a Python or Node.js package",
+    {"name": "string (package name)", "manager": "string (pip or npm, default pip)"},
+)
+async def tool_install_package(name: str, manager: str = "pip") -> str:
+    """Install a package via pip or npm."""
+    safe_name = re.sub(r"[^a-zA-Z0-9_\-@/.]", "", name)
+    if not safe_name:
+        return "ERROR: Invalid package name"
+    if manager == "npm":
+        return await tool_shell(f"npm install {safe_name}")
+    return await tool_shell(f"pip install {safe_name}")
+
+
+@tool(
+    "edit_file",
+    "Replace specific text in a file (search and replace)",
+    {"path": "string (file path)", "old_text": "string (exact text to find)", "new_text": "string (replacement text)"},
+)
+async def tool_edit_file(path: str, old_text: str, new_text: str) -> str:
+    """Edit a file by replacing old_text with new_text."""
+    p = Path(path) if os.path.isabs(path) else Path(WORKSPACE) / path
+    p = p.resolve()
+    if not p.exists():
+        return f"ERROR: File not found: {p}"
+    content = p.read_text(errors="replace")
+    if old_text not in content:
+        return "ERROR: old_text not found in file"
+    count = content.count(old_text)
+    new_content = content.replace(old_text, new_text, 1)
+    p.write_text(new_content)
+    return f"Replaced 1 of {count} occurrence(s) in {p}"
+
+
+@tool(
+    "create_project",
+    "Create a project directory structure from a template",
+    {"name": "string (project name)", "template": "string (python, node, react, or custom)", "files": "object (optional: {path: content} for custom template)"},
+)
+async def tool_create_project(name: str, template: str = "python", files: dict | None = None) -> str:
+    """Scaffold a new project directory."""
+    project_dir = Path(WORKSPACE) / name
+    project_dir.mkdir(parents=True, exist_ok=True)
+    templates = {
+        "python": {
+            "main.py": '"""Main entry point."""\n\ndef main():\n    print("Hello from {name}!")\n\nif __name__ == "__main__":\n    main()\n',
+            "requirements.txt": "",
+            "README.md": f"# {name}\n\nCreated by Delirium Infinite.\n",
+        },
+        "node": {
+            "index.js": f'console.log("Hello from {name}!");\n',
+            "package.json": json.dumps({"name": name, "version": "1.0.0", "main": "index.js"}, indent=2),
+            "README.md": f"# {name}\n\nCreated by Delirium Infinite.\n",
+        },
+    }
+    file_map = files if files else templates.get(template, templates["python"])
+    created: list[str] = []
+    for fp, content in file_map.items():
+        target = project_dir / fp
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content.replace("{name}", name))
+        created.append(str(fp))
+    return f"Created project '{name}' at {project_dir} with files: {', '.join(created)}"

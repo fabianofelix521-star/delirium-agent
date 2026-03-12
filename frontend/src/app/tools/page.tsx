@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   Search,
   Zap,
@@ -70,7 +70,7 @@ export default function ToolsPage() {
   ];
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/tools/`)
+    fetch(`${API_BASE}/api/tools`, { headers: getAuthHeaders() })
       .then((r) => r.json())
       .then((data) => {
         setTools(data);
@@ -98,7 +98,7 @@ export default function ToolsPage() {
     try {
       await fetch(`${API_BASE}/api/tools/${id}/toggle`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ enabled: newEnabled }),
       });
     } catch {

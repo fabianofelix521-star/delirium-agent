@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   Link2,
   Mail,
@@ -139,7 +139,7 @@ export default function IntegrationsPage() {
   /* ─── Data Fetching ──────────────────────────── */
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/integrations/`)
+    fetch(`${API_BASE}/api/integrations`, { headers: getAuthHeaders() })
       .then((r) => r.json())
       .then((data) => setIntegrations(data))
       .catch(() => {});
@@ -149,8 +149,8 @@ export default function IntegrationsPage() {
     if (activeTab === "store") {
       setMcpLoading(true);
       Promise.all([
-        fetch(`${API_BASE}/api/mcp/catalog`).then((r) => r.json()),
-        fetch(`${API_BASE}/api/mcp/categories`).then((r) => r.json()),
+        fetch(`${API_BASE}/api/mcp/catalog`, { headers: getAuthHeaders() }).then((r) => r.json()),
+        fetch(`${API_BASE}/api/mcp/categories`, { headers: getAuthHeaders() }).then((r) => r.json()),
       ])
         .then(([catalog, cats]) => {
           setMcpCatalog(catalog);
@@ -180,7 +180,7 @@ export default function IntegrationsPage() {
           `${API_BASE}/api/integrations/${id}/${action}`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ config: {} }),
           },
         );
@@ -212,7 +212,7 @@ export default function IntegrationsPage() {
       try {
         const res = await fetch(`${API_BASE}/api/mcp/${mcp.id}/install`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ env: configValues }),
         });
         if (res.ok) {
@@ -239,6 +239,7 @@ export default function IntegrationsPage() {
     try {
       const res = await fetch(`${API_BASE}/api/mcp/${id}/uninstall`, {
         method: "POST",
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         setMcpCatalog((prev) =>

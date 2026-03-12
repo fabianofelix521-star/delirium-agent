@@ -16,7 +16,7 @@ import {
   Save,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthHeaders } from "@/lib/api";
 
 const settingsSections = [
   {
@@ -83,9 +83,9 @@ export default function SettingsPage() {
       }
 
       // Persist to backend
-      fetch(`${API_BASE}/api/settings/`, {
+      fetch(`${API_BASE}/api/settings`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           category: "general",
           settings: {

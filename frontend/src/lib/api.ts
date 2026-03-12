@@ -1,5 +1,13 @@
 export const API_BASE = "";
 
+export function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("delirium_token") : null;
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   Settings,
   ChevronDown,
@@ -284,9 +284,9 @@ export default function APIsPage() {
 
   const saveProvider = async (id: string) => {
     const config = configs[id] || {};
-    await fetch(`${API_BASE}/api/settings/`, {
+    await fetch(`${API_BASE}/api/settings`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ category: `provider_${id}`, settings: config }),
     }).catch(() => {});
     localStorage.setItem(`delirium_provider_${id}`, JSON.stringify(config));
@@ -299,9 +299,9 @@ export default function APIsPage() {
 
   const saveIntegration = async (id: string) => {
     const config = integConfigs[id] || {};
-    await fetch(`${API_BASE}/api/settings/`, {
+    await fetch(`${API_BASE}/api/settings`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ category: `integ_${id}`, settings: config }),
     }).catch(() => {});
     localStorage.setItem(`delirium_integ_${id}`, JSON.stringify(config));

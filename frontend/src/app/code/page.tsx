@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   Send,
   Paperclip,
@@ -170,6 +170,9 @@ export default function CodeArenaPage() {
     language: string;
   } | null>(null);
 
+  // Conversation state
+  const [conversationId, setConversationId] = useState<string | null>(null);
+
   // Arena layout state
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
   const [previewHtml, setPreviewHtml] = useState<string>("");
@@ -249,7 +252,7 @@ export default function CodeArenaPage() {
   /* ─── GitHub ─── */
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/github/status`)
+    fetch(`${API_BASE}/api/github/status`, { headers: getAuthHeaders() })
       .then((r) => r.json())
       .then((data) => {
         setGithubConnected(data.connected);
@@ -261,7 +264,7 @@ export default function CodeArenaPage() {
   const loadRepos = async () => {
     setLoadingRepos(true);
     try {
-      const res = await fetch(`${API_BASE}/api/github/repos`);
+      const res = await fetch(`${API_BASE}/api/github/repos`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setRepos(data.repos || []);
@@ -276,6 +279,7 @@ export default function CodeArenaPage() {
     try {
       const res = await fetch(
         `${API_BASE}/api/github/repos/${repo.full_name}/tree`,
+        { headers: getAuthHeaders() }
       );
       if (res.ok) {
         const data = await res.json();
@@ -290,6 +294,7 @@ export default function CodeArenaPage() {
     try {
       const res = await fetch(
         `${API_BASE}/api/github/repos/${repo.full_name}/file?path=${encodeURIComponent(path)}`,
+        { headers: getAuthHeaders() }
       );
       if (res.ok) {
         const data = await res.json();
@@ -385,15 +390,19 @@ export default function CodeArenaPage() {
         ? `${contextParts.join("\n")}\n\nUser: ${userMsg.content}`
         : userMsg.content;
 
+      const token = localStorage.getItem("delirium_token");
       const res = await fetch(`${API_BASE}/api/chat/send`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
-          message: fullMessage,
+          message: `${CODE_SYSTEM_PROMPT}\n\n${fullMessage}`,
+          conversation_id: conversationId || undefined,
           stream: true,
           provider: activeProvider,
           model: activeModel,
-          system_prompt: CODE_SYSTEM_PROMPT,
         }),
       });
 
@@ -414,12 +423,15 @@ export default function CodeArenaPage() {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
+                if (data.type === "start" && data.conversation_id) {
+                  setConversationId(data.conversation_id);
+                }
                 if (data.type === "token") {
                   finalContent += data.content;
                   setMessages((prev) => {
                     const updated = [...prev];
                     const last = updated[updated.length - 1];
-                    if (last.role === "assistant") last.content += data.content;
+                    if (last.role === "assistant") last.content = finalContent;
                     return updated;
                   });
                 }
@@ -997,15 +1009,13 @@ export default function CodeArenaPage() {
 
         {/* ─── LEFT PANEL: Code / Chat ─── */}
         <div
-          className={`flex flex-col min-w-0 ${
-            // On mobile: show only when "code" tab is active
-            // On desktop with split: always show
-            splitView
-              ? "hidden md:flex md:flex-1"
-              : activeTab === "code"
-                ? "flex flex-1"
-                : "hidden md:flex md:flex-1"
-          } ${activeTab === "code" ? "flex flex-1 md:flex" : ""}`}
+          className={`flex-col min-w-0 ${
+            activeTab === "code"
+              ? "flex flex-1"
+              : splitView
+                ? "hidden md:flex md:flex-1"
+                : "hidden"
+          }`}
           style={{
             borderRight: splitView
               ? "1px solid var(--glass-border)"
@@ -1302,11 +1312,11 @@ export default function CodeArenaPage() {
 
         {/* ─── RIGHT PANEL: Live Preview ─── */}
         <div
-          className={`flex flex-col min-w-0 ${
-            splitView
-              ? "hidden md:flex md:flex-1"
-              : activeTab === "preview"
-                ? "flex flex-1"
+          className={`flex-col min-w-0 ${
+            activeTab === "preview"
+              ? "flex flex-1"
+              : splitView
+                ? "hidden md:flex md:flex-1"
                 : "hidden"
           }`}
         >

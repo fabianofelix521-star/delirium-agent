@@ -40,6 +40,7 @@ class ToolToggle(BaseModel):
     enabled: bool
 
 
+@router.get("")
 @router.get("/")
 async def list_tools(category: str | None = None) -> list[dict]:
     """List all available tools, optionally filtered by category."""

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   Send,
   Paperclip,
@@ -74,7 +74,7 @@ function ChatPageInner() {
 
   // Load existing conversation from URL param
   const loadConversation = useCallback((id: string) => {
-    fetch(`${API_BASE}/api/chat/conversations/${id}`)
+    fetch(`${API_BASE}/api/chat/conversations/${id}`, { headers: getAuthHeaders() })
       .then((r) => r.json())
       .then((data) => {
         if (data.error) return;
@@ -164,6 +164,7 @@ function ChatPageInner() {
       formData.append("speed", "1.0");
       const resp = await fetch(`${API_BASE}/api/voice/tts`, {
         method: "POST",
+        headers: (() => { const h = getAuthHeaders(); delete h["Content-Type"]; return h; })(),
         body: formData,
       });
       if (!resp.ok) return;
@@ -218,6 +219,7 @@ function ChatPageInner() {
           fd.append("language", "pt");
           const resp = await fetch(`${API_BASE}/api/voice/stt`, {
             method: "POST",
+            headers: (() => { const h = getAuthHeaders(); delete h["Content-Type"]; return h; })(),
             body: fd,
           });
           if (resp.ok) {
@@ -288,7 +290,7 @@ function ChatPageInner() {
             : "";
         const res = await fetch(`${API_BASE}/api/chat/send`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             message: modePrefix + text,
             conversation_id: conversationId || undefined,
@@ -399,7 +401,7 @@ function ChatPageInner() {
           : "";
       const res = await fetch(`${API_BASE}/api/chat/send`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           message: modePrefix + text.trim(),
           conversation_id: conversationId || undefined,

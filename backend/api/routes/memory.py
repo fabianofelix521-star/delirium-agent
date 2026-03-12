@@ -27,6 +27,7 @@ async def search_memory(q: str = "", type: str | None = None, limit: int = 50) -
     return results[:limit]
 
 
+@router.post("")
 @router.post("/")
 async def add_memory(entry: MemoryEntry) -> dict:
     """Add a memory entry."""

@@ -44,6 +44,7 @@ app = FastAPI(
     description="Autonomous AI Agent — Full Web Interface",
     version="1.0.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # ─── CORS ─────────────────────────────────────────────────

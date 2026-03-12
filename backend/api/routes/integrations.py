@@ -29,6 +29,7 @@ class ConnectRequest(BaseModel):
     config: dict = {}
 
 
+@router.get("")
 @router.get("/")
 async def list_integrations() -> list[dict]:
     """List all available integrations."""

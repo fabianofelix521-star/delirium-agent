@@ -42,6 +42,7 @@ class SettingsUpdate(BaseModel):
     settings: dict[str, Any]
 
 
+@router.get("")
 @router.get("/")
 async def get_settings() -> dict:
     """Get all application settings."""
@@ -56,6 +57,7 @@ async def get_category_settings(category: str) -> dict:
     return _settings[category]
 
 
+@router.put("")
 @router.put("/")
 async def update_settings(update: SettingsUpdate) -> dict:
     """Update settings for a specific category."""

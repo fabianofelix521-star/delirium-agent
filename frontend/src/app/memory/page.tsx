@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   Search,
   Brain,
@@ -36,7 +36,7 @@ export default function MemoryPage() {
       const params = new URLSearchParams();
       if (search) params.set("q", search);
       if (filter !== "all") params.set("type", filter);
-      const res = await fetch(`${API_BASE}/api/memory/search?${params}`);
+      const res = await fetch(`${API_BASE}/api/memory/search?${params}`, { headers: getAuthHeaders() });
       if (res.ok) setMemories(await res.json());
     } catch {}
     setLoading(false);
@@ -49,9 +49,9 @@ export default function MemoryPage() {
   const addMemory = async () => {
     if (!newContent.trim()) return;
     try {
-      const res = await fetch(`${API_BASE}/api/memory/`, {
+      const res = await fetch(`${API_BASE}/api/memory`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           content: newContent,
           type: newType,
@@ -69,7 +69,7 @@ export default function MemoryPage() {
   const deleteMemory = async (id: number) => {
     setMemories((prev) => prev.filter((m) => m.id !== id));
     try {
-      await fetch(`${API_BASE}/api/memory/${id}`, { method: "DELETE" });
+      await fetch(`${API_BASE}/api/memory/${id}`, { method: "DELETE", headers: getAuthHeaders() });
     } catch {}
   };
 

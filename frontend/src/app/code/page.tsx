@@ -28,6 +28,10 @@ import {
   RotateCcw,
   Download,
   FileCode,
+  Clock,
+  Plus,
+  Trash2,
+  Layout,
 } from "lucide-react";
 
 /* ─── Types ─── */
@@ -61,6 +65,72 @@ interface GithubRepo {
   default_branch: string;
   updated_at: string;
   html_url: string;
+}
+
+interface SavedProject {
+  id: string;
+  title: string;
+  previewHtml: string;
+  files: ProjectFile[];
+  messages: Message[];
+  conversationId: string | null;
+  createdAt: number;
+  updatedAt: number;
+  agentId?: string;
+  provider?: string;
+  model?: string;
+}
+
+/* ─── Project History Helpers ─── */
+
+const PROJECTS_KEY = "delirium_code_projects";
+const MAX_PROJECTS = 50;
+
+function loadProjects(): SavedProject[] {
+  try {
+    const raw = localStorage.getItem(PROJECTS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as SavedProject[];
+  } catch {
+    return [];
+  }
+}
+
+function saveProjects(projects: SavedProject[]) {
+  localStorage.setItem(
+    PROJECTS_KEY,
+    JSON.stringify(projects.slice(0, MAX_PROJECTS)),
+  );
+}
+
+function saveProject(project: SavedProject) {
+  const all = loadProjects();
+  const idx = all.findIndex((p) => p.id === project.id);
+  if (idx >= 0) all[idx] = project;
+  else all.unshift(project);
+  saveProjects(all);
+  window.dispatchEvent(new Event("delirium-code-projects-update"));
+}
+
+function deleteProject(id: string) {
+  const all = loadProjects().filter((p) => p.id !== id);
+  saveProjects(all);
+  window.dispatchEvent(new Event("delirium-code-projects-update"));
+}
+
+function generateTitle(messages: Message[]): string {
+  const first = messages.find((m) => m.role === "user");
+  if (!first) return "Untitled Project";
+  const text = first.content.slice(0, 60);
+  return text.length < first.content.length ? text + "..." : text;
+}
+
+function timeAgo(ts: number): string {
+  const diff = (Date.now() - ts) / 1000;
+  if (diff < 60) return "agora";
+  if (diff < 3600) return `${Math.floor(diff / 60)}min`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
 }
 
 /* ─── Constants ─── */
@@ -204,7 +274,10 @@ function extractPreviewHtml(rawContent: string): string | null {
   if (anyBlock) {
     const code = anyBlock[1].trim();
     if (code.includes("<") && code.includes(">")) {
-      if (code.toLowerCase().includes("<!doctype") || code.toLowerCase().includes("<html"))
+      if (
+        code.toLowerCase().includes("<!doctype") ||
+        code.toLowerCase().includes("<html")
+      )
         return code;
       return wrapFragmentInHtml(code);
     }
@@ -341,6 +414,11 @@ export default function CodeArenaPage() {
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [treeExpanded, setTreeExpanded] = useState<Set<string>>(new Set());
 
+  // ─── Project History ───
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -351,6 +429,15 @@ export default function CodeArenaPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load saved projects on mount
+  useEffect(() => {
+    setSavedProjects(loadProjects());
+    const handler = () => setSavedProjects(loadProjects());
+    window.addEventListener("delirium-code-projects-update", handler);
+    return () =>
+      window.removeEventListener("delirium-code-projects-update", handler);
+  }, []);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -451,30 +538,102 @@ export default function CodeArenaPage() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const processAiResponse = useCallback((content: string) => {
-    let files = extractProjectFromToolCall(content);
-    if (!files || files.length === 0) files = extractAllCodeBlocks(content);
+  const processAiResponse = useCallback(
+    (
+      content: string,
+      currentMessages: Message[],
+      currentConvId: string | null,
+    ) => {
+      let files = extractProjectFromToolCall(content);
+      if (!files || files.length === 0) files = extractAllCodeBlocks(content);
 
-    if (files.length > 0) {
-      setProjectFiles(files);
-      setProjectTree(buildFileTree(files));
-      setSelectedFile(files[0]);
-      const folders = new Set<string>();
-      files.forEach((f) => {
-        const parts = f.path.split("/");
-        if (parts.length > 1) folders.add(parts[0]);
-      });
-      setTreeExpanded(folders);
+      if (files.length > 0) {
+        setProjectFiles(files);
+        setProjectTree(buildFileTree(files));
+        setSelectedFile(files[0]);
+        const folders = new Set<string>();
+        files.forEach((f) => {
+          const parts = f.path.split("/");
+          if (parts.length > 1) folders.add(parts[0]);
+        });
+        setTreeExpanded(folders);
+      }
+
+      const html = extractPreviewHtml(content);
+      if (html) {
+        setPreviewHtml(html);
+        setIframeKey((k) => k + 1);
+        setRightTab("preview");
+        setSplitView(true);
+      }
+
+      // Save project to history
+      if (files.length > 0 || html) {
+        const projId = activeProjectId || `proj_${Date.now()}`;
+        const project: SavedProject = {
+          id: projId,
+          title: generateTitle(currentMessages),
+          previewHtml: html || "",
+          files: files.length > 0 ? files : [],
+          messages: currentMessages,
+          conversationId: currentConvId,
+          createdAt: activeProjectId
+            ? loadProjects().find((p) => p.id === projId)?.createdAt ||
+              Date.now()
+            : Date.now(),
+          updatedAt: Date.now(),
+          agentId: localStorage.getItem("delirium_active_agent") || undefined,
+          provider: activeProvider,
+          model: activeModel,
+        };
+        setActiveProjectId(projId);
+        saveProject(project);
+      }
+    },
+    [activeProjectId, activeProvider, activeModel],
+  );
+
+  const restoreProject = useCallback((project: SavedProject) => {
+    setMessages(project.messages);
+    setConversationId(project.conversationId);
+    setActiveProjectId(project.id);
+    setPreviewHtml(project.previewHtml);
+    if (project.files.length > 0) {
+      setProjectFiles(project.files);
+      setProjectTree(buildFileTree(project.files));
+      setSelectedFile(project.files[0]);
     }
-
-    const html = extractPreviewHtml(content);
-    if (html) {
-      setPreviewHtml(html);
+    if (project.previewHtml) {
       setIframeKey((k) => k + 1);
       setRightTab("preview");
       setSplitView(true);
     }
+    setShowHistory(false);
   }, []);
+
+  const startNewProject = useCallback(() => {
+    setMessages([]);
+    setConversationId(null);
+    setActiveProjectId(null);
+    setPreviewHtml("");
+    setProjectFiles([]);
+    setProjectTree([]);
+    setSelectedFile(null);
+    setInput("");
+  }, []);
+
+  // Listen for sidebar restore events
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent).detail?.id;
+      if (!id) return;
+      const projects = loadProjects();
+      const proj = projects.find((p) => p.id === id);
+      if (proj) restoreProject(proj);
+    };
+    window.addEventListener("delirium-restore-code-project", handler);
+    return () => window.removeEventListener("delirium-restore-code-project", handler);
+  }, [restoreProject]);
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
@@ -514,7 +673,8 @@ export default function CodeArenaPage() {
       const token = localStorage.getItem("delirium_token");
       const codeAgent =
         localStorage.getItem("delirium_active_agent") || undefined;
-      const codeInstruction = "IMPORTANT: Output ALL code as a COMPLETE, RUNNABLE HTML file inside a single ```html code block with ALL CSS and JS inline. Never use placeholders.";
+      const codeInstruction =
+        "IMPORTANT: Output ALL code as a COMPLETE, RUNNABLE HTML file inside a single ```html code block with ALL CSS and JS inline. Never use placeholders.";
       const systemPrefix = codeAgent
         ? `${codeInstruction}\n\n`
         : `${CODE_SYSTEM_PROMPT}\n\n`;
@@ -568,7 +728,14 @@ export default function CodeArenaPage() {
             }
           }
         }
-        processAiResponse(finalContent);
+        processAiResponse(
+          finalContent,
+          [
+            ...messages.slice(0, -1),
+            { ...assistantMsg, content: finalContent },
+          ],
+          conversationId,
+        );
       } else {
         setMessages((prev) => {
           const updated = [...prev];
@@ -951,6 +1118,177 @@ export default function CodeArenaPage() {
           </div>
         )}
 
+        {/* ─── Project History Panel ─── */}
+        {showHistory && (
+          <div
+            className="fixed inset-0 z-40 md:relative md:inset-auto md:z-auto w-full md:w-[260px] shrink-0 flex flex-col border-r overflow-hidden animate-fade-in"
+            style={{
+              background: "var(--glass-bg-solid)",
+              borderColor: "var(--glass-border)",
+            }}
+          >
+            <div
+              className="flex items-center justify-between px-3 py-2.5 shrink-0"
+              style={{ borderBottom: "1px solid var(--glass-border)" }}
+            >
+              <div className="flex items-center gap-2">
+                <Clock size={13} style={{ color: "var(--accent-indigo)" }} />
+                <span
+                  className="text-[12px] font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Projects
+                </span>
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: "rgba(99,102,241,0.1)",
+                    color: "var(--accent-indigo)",
+                  }}
+                >
+                  {savedProjects.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={startNewProject}
+                  className="p-1.5 rounded-md hover:bg-white/[0.06] transition-colors"
+                  style={{ color: "var(--accent-indigo)" }}
+                  title="New Project"
+                >
+                  <Plus size={14} />
+                </button>
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="p-1 rounded-md hover:bg-white/[0.04]"
+                  style={{ color: "var(--text-ghost)" }}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {savedProjects.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                    style={{ background: "rgba(99,102,241,0.1)" }}
+                  >
+                    <Layout
+                      size={22}
+                      style={{ color: "var(--accent-indigo)" }}
+                    />
+                  </div>
+                  <p
+                    className="text-[12px] font-medium"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    No projects yet
+                  </p>
+                  <p
+                    className="text-[11px]"
+                    style={{ color: "var(--text-ghost)" }}
+                  >
+                    Create an app or site and it will appear here automatically.
+                  </p>
+                </div>
+              ) : (
+                savedProjects.map((proj) => (
+                  <div
+                    key={proj.id}
+                    className="group rounded-xl overflow-hidden cursor-pointer transition-all hover:ring-1 hover:ring-white/10"
+                    style={{
+                      background:
+                        activeProjectId === proj.id
+                          ? "rgba(99,102,241,0.08)"
+                          : "var(--bg-elevated)",
+                      border: `1px solid ${activeProjectId === proj.id ? "rgba(99,102,241,0.2)" : "var(--glass-border)"}`,
+                    }}
+                    onClick={() => restoreProject(proj)}
+                  >
+                    {/* Thumbnail preview */}
+                    {proj.previewHtml && (
+                      <div
+                        className="relative w-full h-[80px] overflow-hidden"
+                        style={{ background: "white" }}
+                      >
+                        <iframe
+                          srcDoc={proj.previewHtml}
+                          className="w-full border-none pointer-events-none"
+                          style={{
+                            height: "400px",
+                            transform: "scale(0.2)",
+                            transformOrigin: "top left",
+                            width: "500%",
+                          }}
+                          sandbox="allow-same-origin"
+                          tabIndex={-1}
+                          title={proj.title}
+                        />
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            background:
+                              "linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.3))",
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="px-3 py-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <p
+                          className="text-[11px] font-medium leading-tight line-clamp-2"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {proj.title}
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteProject(proj.id);
+                            if (activeProjectId === proj.id) startNewProject();
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-white/[0.08] shrink-0"
+                          style={{ color: "var(--text-ghost)" }}
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className="text-[9px]"
+                          style={{ color: "var(--text-ghost)" }}
+                        >
+                          {timeAgo(proj.updatedAt)}
+                        </span>
+                        {proj.files.length > 0 && (
+                          <span
+                            className="text-[9px]"
+                            style={{ color: "var(--text-ghost)" }}
+                          >
+                            {proj.files.length} files
+                          </span>
+                        )}
+                        {proj.model && (
+                          <span
+                            className="text-[8px] px-1 py-0.5 rounded"
+                            style={{
+                              background: "rgba(99,102,241,0.08)",
+                              color: "var(--accent-indigo)",
+                            }}
+                          >
+                            {proj.model.split("/").pop()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ─── LEFT: Chat ─── */}
         <div
           className={`flex flex-col min-w-0 ${splitView ? "md:w-[45%]" : "flex-1"}`}
@@ -1034,6 +1372,19 @@ export default function CodeArenaPage() {
                   Build anything — preview instantly
                 </p>
                 <div className="flex items-center gap-2 mb-6">
+                  {savedProjects.length > 0 && (
+                    <button
+                      onClick={() => setShowHistory(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium cursor-pointer"
+                      style={{
+                        background: "rgba(99,102,241,0.1)",
+                        border: "1px solid rgba(99,102,241,0.2)",
+                        color: "var(--accent-indigo)",
+                      }}
+                    >
+                      <Clock size={11} /> {savedProjects.length} Projects
+                    </button>
+                  )}
                   <div
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium cursor-pointer"
                     onClick={() => setSidePanel(sidePanel ? null : "repos")}
@@ -1179,7 +1530,11 @@ export default function CodeArenaPage() {
                                   msg.content.includes("```json")) && (
                                   <button
                                     onClick={() =>
-                                      processAiResponse(msg.content)
+                                      processAiResponse(
+                                        msg.content,
+                                        messages,
+                                        conversationId,
+                                      )
                                     }
                                     className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium hover:bg-white/[0.04]"
                                     style={{ color: "var(--accent-indigo)" }}
@@ -1220,6 +1575,18 @@ export default function CodeArenaPage() {
               style={{ borderRadius: "var(--radius-2xl)" }}
             >
               <div className="flex items-end gap-1 p-2">
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-white/[0.04] shrink-0"
+                  style={{
+                    color: showHistory
+                      ? "var(--accent-indigo)"
+                      : "var(--text-ghost)",
+                  }}
+                  title="Project History"
+                >
+                  <Clock size={16} strokeWidth={2} />
+                </button>
                 <button
                   onClick={() => setSidePanel(sidePanel ? null : "repos")}
                   className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-white/[0.04] shrink-0"

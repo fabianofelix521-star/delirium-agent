@@ -55,6 +55,16 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const isChat = pathname === "/chat" || pathname?.startsWith("/chat/");
+  const isCode = pathname === "/code";
+
+  // Code project history from localStorage
+  interface CodeProject {
+    id: string;
+    title: string;
+    updatedAt: number;
+    files: { path: string }[];
+  }
+  const [codeProjects, setCodeProjects] = useState<CodeProject[]>([]);
 
   const fetchConversations = useCallback(() => {
     fetch(`${API_BASE}/api/chat/conversations`, { headers: getAuthHeaders() })
@@ -72,6 +82,27 @@ export function Sidebar() {
     return () =>
       window.removeEventListener("delirium-conversation-update", handler);
   }, [fetchConversations]);
+
+  // Load code projects from localStorage
+  const loadCodeProjects = useCallback(() => {
+    try {
+      const raw = localStorage.getItem("delirium_code_projects");
+      if (raw) {
+        const parsed = JSON.parse(raw) as CodeProject[];
+        setCodeProjects(parsed.slice(0, 8));
+      }
+    } catch {
+      /* */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isCode) loadCodeProjects();
+    const handler = () => loadCodeProjects();
+    window.addEventListener("delirium-code-projects-update", handler);
+    return () =>
+      window.removeEventListener("delirium-code-projects-update", handler);
+  }, [isCode, loadCodeProjects]);
 
   const deleteConversation = (id: string) => {
     fetch(`${API_BASE}/api/chat/conversations/${id}`, {
@@ -212,6 +243,59 @@ export function Sidebar() {
 
       {/* Divider */}
       {!collapsed && isChat && (
+        <div
+          className="mx-5 my-1"
+          style={{ borderBottom: "1px solid var(--glass-border)" }}
+        />
+      )}
+
+      {/* Recent code projects (only when on code page and expanded) */}
+      {!collapsed && isCode && codeProjects.length > 0 && (
+        <div className="px-4 pt-2 pb-1 animate-fade-in">
+          <p
+            className="text-[10px] uppercase tracking-widest font-semibold px-1 mb-1.5"
+            style={{ color: "var(--text-ghost)" }}
+          >
+            Recent Projects
+          </p>
+          <div className="space-y-0.5">
+            {codeProjects.map((proj) => (
+              <button
+                key={proj.id}
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("delirium-restore-code-project", {
+                      detail: { id: proj.id },
+                    }),
+                  );
+                }}
+                className="conversation-item group w-full text-left"
+              >
+                <Code2
+                  size={12}
+                  style={{ color: "var(--accent-indigo)" }}
+                  className="shrink-0"
+                />
+                <span
+                  className="flex-1 text-[12px] truncate"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {proj.title}
+                </span>
+                <span
+                  className="text-[10px] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ color: "var(--text-ghost)" }}
+                >
+                  {timeAgo(proj.updatedAt)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Divider for code */}
+      {!collapsed && isCode && codeProjects.length > 0 && (
         <div
           className="mx-5 my-1"
           style={{ borderBottom: "1px solid var(--glass-border)" }}

@@ -372,15 +372,18 @@ export default function CodeArenaPage() {
       const fullMessage = contextParts.length ? `${contextParts.join("\n")}\n\nUser: ${userMsg.content}` : userMsg.content;
 
       const token = localStorage.getItem("delirium_token");
+      const codeAgent = localStorage.getItem("delirium_active_agent") || undefined;
+      const systemPrefix = codeAgent ? "" : `${CODE_SYSTEM_PROMPT}\n\n`;
       const res = await fetch(`${API_BASE}/api/chat/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
-          message: `${CODE_SYSTEM_PROMPT}\n\n${fullMessage}`,
+          message: `${systemPrefix}${fullMessage}`,
           conversation_id: conversationId || undefined,
           stream: true,
           provider: activeProvider,
           model: activeModel,
+          agent_id: codeAgent,
         }),
       });
 

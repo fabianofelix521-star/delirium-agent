@@ -75,9 +75,7 @@ export default function AgentsPage() {
       !searchQuery ||
       a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.skills.some((s) =>
-        s.toLowerCase().includes(searchQuery.toLowerCase()),
-      );
+      a.skills.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchCat && matchSearch;
   });
 
@@ -179,10 +177,10 @@ export default function AgentsPage() {
               </div>
             </div>
             <button
-              onClick={() => (window.location.href = "/chat")}
+              onClick={() => (window.location.href = "/code")}
               className="btn-primary flex items-center gap-1.5 text-[11px] shrink-0"
             >
-              Chat <ArrowRight size={12} />
+              Code <ArrowRight size={12} />
             </button>
           </div>
         </div>
@@ -215,8 +213,7 @@ export default function AgentsPage() {
                   filterCategory === cat
                     ? "var(--accent-indigo)"
                     : "var(--bg-elevated)",
-                color:
-                  filterCategory === cat ? "#fff" : "var(--text-muted)",
+                color: filterCategory === cat ? "#fff" : "var(--text-muted)",
                 border: `1px solid ${filterCategory === cat ? "transparent" : "var(--glass-border)"}`,
               }}
             >
@@ -314,10 +311,7 @@ export default function AgentsPage() {
                   >
                     {a.name}
                   </h3>
-                  <p
-                    className="text-[11px] mt-0.5"
-                    style={{ color: a.color }}
-                  >
+                  <p className="text-[11px] mt-0.5" style={{ color: a.color }}>
                     {a.role}
                   </p>
                   <p

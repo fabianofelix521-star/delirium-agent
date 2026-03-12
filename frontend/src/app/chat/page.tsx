@@ -307,7 +307,8 @@ function ChatPageInner() {
             ? `[Active modes: ${Array.from(activeModes).join(", ")}] `
             : "";
         const thinkStart = Date.now();
-        const selectedAgent = localStorage.getItem("delirium_active_agent") || undefined;
+        const selectedAgent =
+          localStorage.getItem("delirium_active_agent") || undefined;
         const res = await fetch(`${API_BASE}/api/chat/send`, {
           method: "POST",
           headers: getAuthHeaders(),
@@ -445,7 +446,8 @@ function ChatPageInner() {
           ? `[Active modes: ${Array.from(activeModes).join(", ")}] `
           : "";
       const thinkStartTime = Date.now();
-      const voiceAgent = localStorage.getItem("delirium_active_agent") || undefined;
+      const voiceAgent =
+        localStorage.getItem("delirium_active_agent") || undefined;
       const res = await fetch(`${API_BASE}/api/chat/send`, {
         method: "POST",
         headers: getAuthHeaders(),

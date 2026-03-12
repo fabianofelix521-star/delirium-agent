@@ -30,6 +30,14 @@ import {
 
 /* ─── Types ──────────────────────────────────────── */
 
+interface ConfigField {
+  key: string;
+  label: string;
+  placeholder: string;
+  type: string;
+  help: string;
+}
+
 interface Integration {
   id: string;
   name: string;
@@ -37,6 +45,9 @@ interface Integration {
   description: string;
   status: string;
   config: Record<string, string>;
+  fields?: ConfigField[];
+  bot_name?: string | null;
+  verified_at?: number | null;
 }
 
 interface McpItem {
@@ -123,6 +134,11 @@ export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [intCategory, setIntCategory] = useState("all");
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [connectModalId, setConnectModalId] = useState<string | null>(null);
+  const [connectFormValues, setConnectFormValues] = useState<Record<string, string>>({});
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [connectSuccess, setConnectSuccess] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
   const intCategories = ["all", "communication", "productivity", "finance"];
 
   // MCP Store state
@@ -169,33 +185,92 @@ export default function IntegrationsPage() {
 
   /* ─── Integration Actions ────────────────────── */
 
-  const toggleConnection = useCallback(
+  const openConnectModal = useCallback((id: string) => {
+    setConnectModalId(id);
+    setConnectFormValues({});
+    setConnectError(null);
+    setConnectSuccess(null);
+  }, []);
+
+  const closeConnectModal = useCallback(() => {
+    setConnectModalId(null);
+    setConnectFormValues({});
+    setConnectError(null);
+    setConnectSuccess(null);
+  }, []);
+
+  const submitConnection = useCallback(
     async (id: string) => {
-      const int = integrations.find((i) => i.id === id);
-      if (!int) return;
-      const action = int.status === "connected" ? "disconnect" : "connect";
       setConnecting(id);
+      setConnectError(null);
+      setConnectSuccess(null);
       try {
-        const res = await fetch(
-          `${API_BASE}/api/integrations/${id}/${action}`,
-          {
-            method: "POST",
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ config: {} }),
-          },
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setIntegrations((prev) =>
-            prev.map((i) => (i.id === id ? { ...i, status: data.status } : i)),
-          );
+        const res = await fetch(`${API_BASE}/api/integrations/${id}/connect`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ config: connectFormValues }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setConnectError(data.detail || "Connection failed");
+          setConnecting(null);
+          return;
         }
+        setIntegrations((prev) =>
+          prev.map((i) => (i.id === id ? { ...i, status: "connected", bot_name: data.details?.bot_name } : i)),
+        );
+        const detailMsg = data.details?.bot_name || data.details?.email || data.details?.workspace || data.details?.service_email || data.details?.display_name || data.details?.account_type || "Validated";
+        setConnectSuccess(`Connected! ${detailMsg}`);
+        setTimeout(() => closeConnectModal(), 1500);
       } catch {
-        /* silent */
+        setConnectError("Network error. Check your connection.");
       }
       setConnecting(null);
     },
-    [integrations],
+    [connectFormValues, closeConnectModal],
+  );
+
+  const disconnectIntegration = useCallback(
+    async (id: string) => {
+      setConnecting(id);
+      try {
+        const res = await fetch(`${API_BASE}/api/integrations/${id}/disconnect`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) {
+          setIntegrations((prev) =>
+            prev.map((i) => (i.id === id ? { ...i, status: "disconnected", bot_name: null } : i)),
+          );
+        }
+      } catch { /* silent */ }
+      setConnecting(null);
+    },
+    [],
+  );
+
+  const testIntegration = useCallback(
+    async (id: string) => {
+      setTestingId(id);
+      try {
+        const res = await fetch(`${API_BASE}/api/integrations/${id}/test`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          setIntegrations((prev) =>
+            prev.map((i) => (i.id === id ? { ...i, status: "connected" } : i)),
+          );
+        } else {
+          setIntegrations((prev) =>
+            prev.map((i) => (i.id === id ? { ...i, status: "error" } : i)),
+          );
+        }
+      } catch { /* silent */ }
+      setTestingId(null);
+    },
+    [],
   );
 
   /* ─── MCP Actions ────────────────────────────── */
@@ -463,6 +538,7 @@ export default function IntegrationsPage() {
               filteredIntegrations.map((int) => {
                 const Icon = iconMap[int.id] || Link2;
                 const color = colorMap[int.id] || "#6366f1";
+                const isConnected = int.status === "connected";
                 return (
                   <div
                     key={int.id}
@@ -482,6 +558,11 @@ export default function IntegrationsPage() {
                             style={{ color: "var(--text-primary)" }}
                           >
                             {int.name}
+                            {int.bot_name && (
+                              <span className="ml-1.5 text-[10px] font-normal" style={{ color: "var(--text-muted)" }}>
+                                {int.bot_name}
+                              </span>
+                            )}
                           </h3>
                           <div className="flex items-center gap-1.5">
                             <div
@@ -491,14 +572,14 @@ export default function IntegrationsPage() {
                                 height: 6,
                                 borderRadius: "50%",
                                 background:
-                                  int.status === "connected"
-                                    ? "var(--success)"
+                                  isConnected ? "var(--success)"
+                                    : int.status === "error" ? "var(--error)"
                                     : "var(--text-ghost)",
                               }}
                             />
                             <span
                               className="text-[10px] capitalize font-medium"
-                              style={{ color: "var(--text-ghost)" }}
+                              style={{ color: isConnected ? "var(--success)" : "var(--text-ghost)" }}
                             >
                               {int.status}
                             </span>
@@ -510,26 +591,37 @@ export default function IntegrationsPage() {
                         >
                           {int.description}
                         </p>
-                        <button
-                          onClick={() => toggleConnection(int.id)}
-                          disabled={connecting === int.id}
-                          className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${int.status === "connected" ? "btn-ghost" : "btn-primary"}`}
-                          style={
-                            int.status === "connected"
-                              ? {
-                                  color: "var(--error)",
-                                  borderColor: "rgba(239,68,68,0.2)",
-                                }
-                              : {}
-                          }
-                        >
-                          {connecting === int.id && (
-                            <Loader2 size={12} className="animate-spin" />
+                        <div className="flex items-center gap-2">
+                          {isConnected ? (
+                            <>
+                              <button
+                                onClick={() => testIntegration(int.id)}
+                                disabled={testingId === int.id}
+                                className="btn-ghost text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+                              >
+                                {testingId === int.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                Test
+                              </button>
+                              <button
+                                onClick={() => disconnectIntegration(int.id)}
+                                disabled={connecting === int.id}
+                                className="btn-ghost text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+                                style={{ color: "var(--error)", borderColor: "rgba(239,68,68,0.2)" }}
+                              >
+                                {connecting === int.id && <Loader2 size={12} className="animate-spin" />}
+                                Disconnect
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => openConnectModal(int.id)}
+                              className="btn-primary text-xs font-semibold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5"
+                            >
+                              <Zap size={12} />
+                              Connect
+                            </button>
                           )}
-                          {int.status === "connected"
-                            ? "Disconnect"
-                            : "Connect"}
-                        </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -537,6 +629,103 @@ export default function IntegrationsPage() {
               })
             )}
           </div>
+
+          {/* ════════ CONNECT MODAL ════════ */}
+          {connectModalId && (() => {
+            const modalInt = integrations.find((i) => i.id === connectModalId);
+            if (!modalInt) return null;
+            const Icon = iconMap[modalInt.id] || Link2;
+            const color = colorMap[modalInt.id] || "#6366f1";
+            const fields = modalInt.fields || [];
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+                <div className="liquid-glass w-full max-w-md p-6 relative animate-fade-in" style={{ background: "var(--bg-elevated)", border: "1px solid var(--glass-border)" }}>
+                  <button onClick={closeConnectModal} className="absolute top-3 right-3" aria-label="Close">
+                    <X size={18} style={{ color: "var(--text-muted)" }} />
+                  </button>
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: `${color}15`, color }}>
+                      <Icon size={22} strokeWidth={1.8} />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
+                        Connect {modalInt.name}
+                      </h2>
+                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                        Enter your API credentials below
+                      </p>
+                    </div>
+                  </div>
+
+                  {connectError && (
+                    <div className="mb-4 p-3 rounded-xl text-xs font-medium" style={{ background: "rgba(239,68,68,0.1)", color: "var(--error)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                      {connectError}
+                    </div>
+                  )}
+                  {connectSuccess && (
+                    <div className="mb-4 p-3 rounded-xl text-xs font-medium" style={{ background: "rgba(16,185,129,0.1)", color: "var(--success)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                      ✓ {connectSuccess}
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    {fields.map((field) => (
+                      <div key={field.key}>
+                        <label className="text-[11px] font-semibold block mb-1.5" style={{ color: "var(--text-secondary)" }}>
+                          {field.label}
+                        </label>
+                        {field.type === "textarea" ? (
+                          <textarea
+                            placeholder={field.placeholder}
+                            value={connectFormValues[field.key] || ""}
+                            onChange={(e) => setConnectFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                            rows={4}
+                            className="w-full px-3 py-2 rounded-xl text-xs bg-transparent outline-none resize-none"
+                            style={{ border: "1px solid var(--glass-border)", color: "var(--text-primary)" }}
+                          />
+                        ) : (
+                          <input
+                            type={field.type === "password" ? "password" : "text"}
+                            placeholder={field.placeholder}
+                            value={connectFormValues[field.key] || ""}
+                            onChange={(e) => setConnectFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                            className="w-full px-3 py-2 rounded-xl text-xs bg-transparent outline-none"
+                            style={{ border: "1px solid var(--glass-border)", color: "var(--text-primary)" }}
+                          />
+                        )}
+                        {field.help && (
+                          <p className="text-[10px] mt-1" style={{ color: "var(--text-ghost)" }}>
+                            {field.help}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-3 mt-6">
+                    <button
+                      onClick={closeConnectModal}
+                      className="btn-ghost text-xs font-semibold px-4 py-2 rounded-xl flex-1"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => submitConnection(connectModalId)}
+                      disabled={connecting === connectModalId}
+                      className="btn-primary text-xs font-semibold px-4 py-2 rounded-xl flex-1 flex items-center justify-center gap-2"
+                    >
+                      {connecting === connectModalId ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Zap size={14} />
+                      )}
+                      {connecting === connectModalId ? "Validating..." : "Connect"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 

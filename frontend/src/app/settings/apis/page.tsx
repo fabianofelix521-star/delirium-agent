@@ -311,9 +311,6 @@ export default function APIsPage() {
                       style={{ color: "var(--text-primary)" }}
                     >
                       {provider.name}
-                      {provider.isLocal && (
-                        <span className="badge badge-success">LOCAL</span>
-                      )}
                     </h3>
                     <p
                       className="text-[11px] truncate"

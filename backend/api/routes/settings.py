@@ -84,6 +84,21 @@ async def list_providers() -> list[dict]:
     return result
 
 
+class ProviderConfig(BaseModel):
+    provider: str
+    config: dict[str, Any]
+
+
+@router.post("/providers/configure")
+async def configure_provider(body: ProviderConfig) -> dict:
+    """Configure a provider at runtime with an API key from the UI."""
+    try:
+        result = llm_router.configure_provider(body.provider, body.config)
+        return {"status": "ok", **result, "providers": llm_router.list_providers()}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @router.post("/providers/test/{provider_name}")
 async def test_provider(provider_name: str) -> dict:
     """Test connection to a specific provider."""

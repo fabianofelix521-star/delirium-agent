@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   MessageCircle,
   Wrench,
@@ -57,7 +57,7 @@ export function Sidebar() {
   const isChat = pathname === "/chat" || pathname?.startsWith("/chat/");
 
   const fetchConversations = useCallback(() => {
-    fetch(`${API_BASE}/api/chat/conversations`)
+    fetch(`${API_BASE}/api/chat/conversations`, { headers: getAuthHeaders() })
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setConversations(data);
@@ -74,7 +74,7 @@ export function Sidebar() {
   }, [fetchConversations]);
 
   const deleteConversation = (id: string) => {
-    fetch(`${API_BASE}/api/chat/conversations/${id}`, { method: "DELETE" })
+    fetch(`${API_BASE}/api/chat/conversations/${id}`, { method: "DELETE", headers: getAuthHeaders() })
       .then(() => {
         setConversations((prev) => prev.filter((c) => c.id !== id));
         window.dispatchEvent(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   Cpu,
@@ -30,7 +30,7 @@ interface ServiceStatus {
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [prevNetwork, setPrevNetwork] = useState<{
+  const prevNetworkRef = useRef<{
     sent: number;
     recv: number;
   } | null>(null);
@@ -53,28 +53,28 @@ export default function DashboardPage() {
       setCpuHistory((prev) => [...prev.slice(1), data.cpu.percent]);
       setMemHistory((prev) => [...prev.slice(1), data.memory.percent]);
 
-      if (prevNetwork) {
+      if (prevNetworkRef.current) {
         const upMB = (
-          (data.network.bytes_sent - prevNetwork.sent) /
+          (data.network.bytes_sent - prevNetworkRef.current.sent) /
           1024 /
           1024
         ).toFixed(1);
         const downMB = (
-          (data.network.bytes_recv - prevNetwork.recv) /
+          (data.network.bytes_recv - prevNetworkRef.current.recv) /
           1024 /
           1024
         ).toFixed(1);
         setNetSpeed({ up: upMB, down: downMB });
       }
-      setPrevNetwork({
+      prevNetworkRef.current = {
         sent: data.network.bytes_sent,
         recv: data.network.bytes_recv,
-      });
+      };
       setLastRefresh(new Date());
     } catch {
       /* backend offline */
     }
-  }, [prevNetwork]);
+  }, []);
 
   const fetchServices = useCallback(async () => {
     try {

@@ -512,7 +512,7 @@ function ChatPageInner() {
                         <span style="color:var(--text-ghost);font-size:0.65rem;font-weight:600;text-transform:uppercase">${lang || "code"}</span>
                         <button class="copy-code-btn" style="color:var(--text-ghost);font-size:0.65rem;padding:2px 6px;border-radius:4px;cursor:pointer">Copy</button>
                     </div>
-                    <pre style="margin:0;border:0;border-radius:0;background:transparent !important"><code class="language-${lang}">${code}</code></pre>
+                    <pre style="margin:0;border:0;border-radius:0;background:transparent !important"><code class="language-${lang}">${code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>
                 </div>`;
         },
       )

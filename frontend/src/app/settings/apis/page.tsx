@@ -289,6 +289,7 @@ export default function APIsPage() {
     try {
       const res = await fetch(`${API_BASE}/api/settings/providers/test/${id}`, {
         method: "POST",
+        headers: getAuthHeaders(),
       });
       const data = await res.json();
       setTestResults((prev) => ({
@@ -307,7 +308,15 @@ export default function APIsPage() {
       headers: getAuthHeaders(),
       body: JSON.stringify({ category: `provider_${id}`, settings: config }),
     }).catch(() => {});
+    // Hot-reload the provider in the backend
+    await fetch(`${API_BASE}/api/settings/providers/configure`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ provider: id, config }),
+    }).catch(() => {});
     localStorage.setItem(`delirium_provider_${id}`, JSON.stringify(config));
+    // Notify Navbar to refresh provider list
+    window.dispatchEvent(new CustomEvent("delirium-providers-updated"));
     setSaveSuccess((prev) => ({ ...prev, [id]: true }));
     setTimeout(
       () => setSaveSuccess((prev) => ({ ...prev, [id]: false })),

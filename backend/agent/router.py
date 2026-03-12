@@ -94,9 +94,48 @@ class LLMRouter:
                 provider_name=os.getenv("CUSTOM_API_NAME", "custom"),
             )
 
+        # Together AI (OpenAI-compatible)
+        if key := os.getenv("TOGETHER_API_KEY"):
+            self.providers["together"] = CustomProvider(
+                api_key=key,
+                base_url="https://api.together.xyz/v1",
+                default_model=os.getenv("TOGETHER_DEFAULT_MODEL", "meta-llama/Llama-3.1-70B"),
+                provider_name="Together AI",
+            )
+            self.providers["together"].models = [
+                "meta-llama/Llama-3.1-70B", "Qwen/Qwen2.5-72B",
+                "meta-llama/Llama-3.1-8B", "mistralai/Mixtral-8x7B-v0.1",
+            ]
+
+        # Mistral AI (OpenAI-compatible)
+        if key := os.getenv("MISTRAL_API_KEY"):
+            self.providers["mistral"] = CustomProvider(
+                api_key=key,
+                base_url="https://api.mistral.ai/v1",
+                default_model=os.getenv("MISTRAL_DEFAULT_MODEL", "mistral-large-latest"),
+                provider_name="Mistral AI",
+            )
+            self.providers["mistral"].models = [
+                "mistral-large-latest", "codestral-latest",
+                "mistral-small-latest", "open-mistral-nemo",
+            ]
+
+        # Cohere (OpenAI-compatible)
+        if key := os.getenv("COHERE_API_KEY"):
+            self.providers["cohere"] = CustomProvider(
+                api_key=key,
+                base_url="https://api.cohere.ai/v1",
+                default_model=os.getenv("COHERE_DEFAULT_MODEL", "command-r-plus"),
+                provider_name="Cohere",
+            )
+            self.providers["cohere"].models = [
+                "command-r-plus", "command-r", "command-light",
+            ]
+
         # Set default and fallback
         self.default_provider = os.getenv("DEFAULT_PROVIDER", "alibaba")
-        self.fallback_order = [p for p in ["alibaba", "openrouter", "groq", "openai", "anthropic", "google", "custom"] if p in self.providers]
+        self.fallback_order = [p for p in ["alibaba", "openrouter", "together", "mistral", "cohere",
+                                           "groq", "openai", "anthropic", "google", "custom"] if p in self.providers]
 
     def get_provider(self, name: str | None = None) -> BaseProvider:
         """Get a specific provider or the default one."""
@@ -161,6 +200,117 @@ class LLMRouter:
                     raise
 
         raise last_error or RuntimeError("No providers available")
+
+    def configure_provider(self, name: str, config: dict) -> dict:
+        """Hot-reload a provider from UI-provided config (API key, endpoint, etc.)."""
+        api_key = config.get("api_key", "").strip()
+        if not api_key:
+            # Remove provider if key cleared
+            if name in self.providers:
+                del self.providers[name]
+                self.fallback_order = [p for p in self.fallback_order if p != name]
+            return {"status": "removed", "provider": name}
+
+        if name == "openai":
+            self.providers["openai"] = OpenAIProvider(
+                api_key=api_key, org_id=config.get("org_id", ""),
+                default_model=config.get("default_model", "gpt-4o"),
+            )
+        elif name == "anthropic":
+            self.providers["anthropic"] = AnthropicProvider(
+                api_key=api_key,
+                default_model=config.get("default_model", "claude-3-5-sonnet-20241022"),
+            )
+        elif name == "google":
+            self.providers["google"] = GoogleProvider(
+                api_key=api_key,
+                default_model=config.get("default_model", "gemini-2.0-flash"),
+            )
+        elif name == "groq":
+            self.providers["groq"] = GroqProvider(
+                api_key=api_key,
+                default_model=config.get("default_model", "llama-3.1-70b-versatile"),
+            )
+        elif name == "alibaba":
+            endpoint = config.get("endpoint", "https://coding-intl.dashscope.aliyuncs.com/v1")
+            self.providers["alibaba"] = CustomProvider(
+                api_key=api_key, base_url=endpoint,
+                default_model=config.get("default_model", "qwen3-coder-plus"),
+                provider_name="Alibaba DashScope",
+            )
+            self.providers["alibaba"].models = [
+                "qwen3-coder-plus", "qwen3-coder-next", "qwen3.5-plus",
+                "glm-5", "kimi-k2.5", "MiniMax-M2.5",
+            ]
+        elif name == "openrouter":
+            self.providers["openrouter"] = CustomProvider(
+                api_key=api_key, base_url="https://openrouter.ai/api/v1",
+                default_model=config.get("default_model", "anthropic/claude-sonnet-4"),
+                provider_name="OpenRouter",
+                custom_headers={"HTTP-Referer": os.getenv("APP_URL", "http://localhost:3000")},
+            )
+            self.providers["openrouter"].models = [
+                "anthropic/claude-sonnet-4", "anthropic/claude-4-opus",
+                "openai/gpt-4o", "openai/o1-preview",
+                "google/gemini-2.5-pro", "google/gemini-2.0-flash",
+                "meta-llama/llama-4-maverick", "meta-llama/llama-3.1-405b",
+                "deepseek/deepseek-r1", "mistralai/mistral-large",
+                "qwen/qwen3-coder", "cohere/command-r-plus",
+            ]
+            # Append custom models from config
+            custom_models_str = config.get("custom_models", "")
+            if custom_models_str:
+                existing = set(self.providers["openrouter"].models)
+                for m in custom_models_str.splitlines():
+                    m = m.strip()
+                    if m and m not in existing:
+                        self.providers["openrouter"].models.append(m)
+        elif name == "together":
+            self.providers["together"] = CustomProvider(
+                api_key=api_key, base_url="https://api.together.xyz/v1",
+                default_model=config.get("default_model", "meta-llama/Llama-3.1-70B"),
+                provider_name="Together AI",
+            )
+            self.providers["together"].models = [
+                "meta-llama/Llama-3.1-70B", "Qwen/Qwen2.5-72B",
+                "meta-llama/Llama-3.1-8B", "mistralai/Mixtral-8x7B-v0.1",
+            ]
+        elif name == "mistral":
+            self.providers["mistral"] = CustomProvider(
+                api_key=api_key, base_url="https://api.mistral.ai/v1",
+                default_model=config.get("default_model", "mistral-large-latest"),
+                provider_name="Mistral AI",
+            )
+            self.providers["mistral"].models = [
+                "mistral-large-latest", "codestral-latest",
+                "mistral-small-latest", "open-mistral-nemo",
+            ]
+        elif name == "cohere":
+            self.providers["cohere"] = CustomProvider(
+                api_key=api_key, base_url="https://api.cohere.ai/v1",
+                default_model=config.get("default_model", "command-r-plus"),
+                provider_name="Cohere",
+            )
+            self.providers["cohere"].models = [
+                "command-r-plus", "command-r", "command-light",
+            ]
+        elif name == "custom":
+            base_url = config.get("base_url", "").strip()
+            if not base_url:
+                return {"status": "error", "message": "Base URL required for custom provider"}
+            self.providers["custom"] = CustomProvider(
+                api_key=api_key, base_url=base_url,
+                default_model=config.get("model", ""),
+                provider_name=config.get("name", "Custom"),
+            )
+        else:
+            return {"status": "error", "message": f"Unknown provider: {name}"}
+
+        # Update fallback order
+        all_fallback = ["alibaba", "openrouter", "together", "mistral", "cohere",
+                        "groq", "openai", "anthropic", "google", "custom"]
+        self.fallback_order = [p for p in all_fallback if p in self.providers]
+        return {"status": "configured", "provider": name}
 
     def list_providers(self) -> list[dict]:
         """List all configured providers and their models."""

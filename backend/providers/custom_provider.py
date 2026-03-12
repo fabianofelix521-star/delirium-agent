@@ -1,6 +1,7 @@
 """Custom OpenAI-Compatible Provider - Works with any OpenAI-compatible API"""
 
 from typing import AsyncGenerator
+import json
 import httpx
 from providers.base import BaseProvider, LLMResponse, Message
 
@@ -53,10 +54,9 @@ class CustomProvider(BaseProvider):
             ) as resp:
                 if resp.status_code != 200:
                     body = await resp.aread()
-                    raise RuntimeError(f"DashScope API error {resp.status_code}: {body.decode()}")
+                    raise RuntimeError(f"{self.name} API error {resp.status_code}: {body.decode()}")
                 async for line in resp.aiter_lines():
                     if line.startswith("data: ") and line != "data: [DONE]":
-                        import json
                         chunk = json.loads(line[6:])
                         delta = chunk["choices"][0].get("delta", {})
                         if content := delta.get("content"):

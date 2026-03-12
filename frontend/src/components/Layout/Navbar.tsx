@@ -1,8 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
-import { API_BASE } from "@/lib/api";
+import { useState, useEffect, useCallback } from "react";
+import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   Search,
   Bell,
@@ -68,8 +68,8 @@ export function Navbar() {
   const filteredModels = models.filter((m) => m.providerKey === selectedModel.providerKey);
 
   // Fetch providers/models from backend
-  useEffect(() => {
-    fetch(`${API_BASE}/api/settings/providers/list`)
+  const fetchProviders = useCallback(() => {
+    fetch(`${API_BASE}/api/settings/providers/list`, { headers: getAuthHeaders() })
       .then((r) => r.json())
       .then(
         (
@@ -112,6 +112,14 @@ export function Navbar() {
         /* keep fallback */
       });
   }, []);
+
+  useEffect(() => {
+    fetchProviders();
+    // Re-fetch when providers are updated from settings page
+    const handler = () => fetchProviders();
+    window.addEventListener("delirium-providers-updated", handler);
+    return () => window.removeEventListener("delirium-providers-updated", handler);
+  }, [fetchProviders]);
 
   const pageTitle = () => {
     const titles: Record<string, string> = {

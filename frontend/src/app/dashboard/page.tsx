@@ -46,7 +46,9 @@ export default function DashboardPage() {
 
   const fetchMetrics = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/system/metrics`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE}/api/system/metrics`, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) return;
       const data: Metrics = await res.json();
       setMetrics(data);
@@ -78,14 +80,18 @@ export default function DashboardPage() {
 
   const fetchServices = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/system/services`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE}/api/system/services`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) setServices(await res.json());
     } catch {}
   }, []);
 
   const fetchConversations = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/chat/conversations`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE}/api/chat/conversations`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) setConversations(await res.json());
     } catch {}
   }, []);

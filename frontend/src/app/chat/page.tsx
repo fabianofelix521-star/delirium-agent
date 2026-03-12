@@ -27,6 +27,10 @@ import {
   MicOff,
   Volume2,
   VolumeX,
+  Download,
+  Brain,
+  Clock,
+  ChevronDown,
 } from "lucide-react";
 
 interface AgentStep {
@@ -41,6 +45,8 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  thinking?: string;
+  thinkingDuration?: number;
   timestamp: number;
   steps?: AgentStep[];
 }
@@ -52,6 +58,7 @@ function ChatPageInner() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showSteps, setShowSteps] = useState<Record<string, boolean>>({});
+  const [showThinking, setShowThinking] = useState<Record<string, boolean>>({});
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [activeProvider, setActiveProvider] = useState("alibaba");
@@ -74,7 +81,9 @@ function ChatPageInner() {
 
   // Load existing conversation from URL param
   const loadConversation = useCallback((id: string) => {
-    fetch(`${API_BASE}/api/chat/conversations/${id}`, { headers: getAuthHeaders() })
+    fetch(`${API_BASE}/api/chat/conversations/${id}`, {
+      headers: getAuthHeaders(),
+    })
       .then((r) => r.json())
       .then((data) => {
         if (data.error) return;
@@ -164,7 +173,11 @@ function ChatPageInner() {
       formData.append("speed", "1.0");
       const resp = await fetch(`${API_BASE}/api/voice/tts`, {
         method: "POST",
-        headers: (() => { const h = getAuthHeaders(); delete h["Content-Type"]; return h; })(),
+        headers: (() => {
+          const h = getAuthHeaders();
+          delete h["Content-Type"];
+          return h;
+        })(),
         body: formData,
       });
       if (!resp.ok) return;
@@ -219,7 +232,11 @@ function ChatPageInner() {
           fd.append("language", "pt");
           const resp = await fetch(`${API_BASE}/api/voice/stt`, {
             method: "POST",
-            headers: (() => { const h = getAuthHeaders(); delete h["Content-Type"]; return h; })(),
+            headers: (() => {
+              const h = getAuthHeaders();
+              delete h["Content-Type"];
+              return h;
+            })(),
             body: fd,
           });
           if (resp.ok) {
@@ -271,6 +288,7 @@ function ChatPageInner() {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: "",
+        thinking: "",
         timestamp: Date.now(),
         steps: [
           {
@@ -288,6 +306,7 @@ function ChatPageInner() {
           activeModes.size > 0
             ? `[Active modes: ${Array.from(activeModes).join(", ")}] `
             : "";
+        const thinkStart = Date.now();
         const res = await fetch(`${API_BASE}/api/chat/send`, {
           method: "POST",
           headers: getAuthHeaders(),
@@ -310,6 +329,8 @@ function ChatPageInner() {
           const decoder = new TextDecoder();
           let buffer = "";
           let fullResp = "";
+          let thinkBuf = "";
+          let inThink = false;
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -323,11 +344,18 @@ function ChatPageInner() {
                   if (d.type === "start" && d.conversation_id)
                     setConversationId(d.conversation_id);
                   if (d.type === "token") {
-                    fullResp += d.content;
+                    const tk = d.content;
+                    if (tk.includes("<think>")) { inThink = true; thinkBuf += (tk.split("<think>")[1] || ""); }
+                    else if (inThink && tk.includes("</think>")) { thinkBuf += tk.split("</think>")[0]; inThink = false; const r = tk.split("</think>")[1] || ""; if (r) fullResp += r; }
+                    else if (inThink) { thinkBuf += tk; }
+                    else { fullResp += tk; }
                     setMessages((prev) => {
                       const u = [...prev];
                       const l = u[u.length - 1];
-                      if (l.role === "assistant") l.content = fullResp;
+                      if (l.role === "assistant") {
+                        l.content = fullResp;
+                        if (thinkBuf) { l.thinking = thinkBuf; l.thinkingDuration = Math.round((Date.now() - thinkStart) / 1000); }
+                      }
                       return u;
                     });
                   }
@@ -388,6 +416,7 @@ function ChatPageInner() {
       id: (Date.now() + 1).toString(),
       role: "assistant",
       content: "",
+      thinking: "",
       timestamp: Date.now(),
       steps: agentSteps,
     };
@@ -399,6 +428,7 @@ function ChatPageInner() {
         activeModes.size > 0
           ? `[Active modes: ${Array.from(activeModes).join(", ")}] `
           : "";
+      const thinkStartTime = Date.now();
       const res = await fetch(`${API_BASE}/api/chat/send`, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -423,6 +453,9 @@ function ChatPageInner() {
         const decoder = new TextDecoder();
         let buffer = "";
         let fullResp = "";
+        let thinkingContent = "";
+        let isInThinkBlock = false;
+        let thinkingDone = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -438,11 +471,46 @@ function ChatPageInner() {
                   setConversationId(data.conversation_id);
                 }
                 if (data.type === "token") {
-                  fullResp += data.content;
+                  const token = data.content;
+                  // Parse <think> tags from reasoning models (Qwen3, DeepSeek, etc)
+                  if (token.includes("<think>")) {
+                    isInThinkBlock = true;
+                    const after = token.split("<think>")[1] || "";
+                    if (after.includes("</think>")) {
+                      thinkingContent += after.split("</think>")[0];
+                      isInThinkBlock = false;
+                      thinkingDone = true;
+                      const remainder = after.split("</think>")[1] || "";
+                      if (remainder) fullResp += remainder;
+                    } else {
+                      thinkingContent += after;
+                    }
+                  } else if (isInThinkBlock) {
+                    if (token.includes("</think>")) {
+                      thinkingContent += token.split("</think>")[0];
+                      isInThinkBlock = false;
+                      thinkingDone = true;
+                      const remainder = token.split("</think>")[1] || "";
+                      if (remainder) fullResp += remainder;
+                    } else {
+                      thinkingContent += token;
+                    }
+                  } else {
+                    fullResp += token;
+                  }
+
                   setMessages((prev) => {
                     const updated = [...prev];
                     const last = updated[updated.length - 1];
-                    if (last.role === "assistant") last.content = fullResp;
+                    if (last.role === "assistant") {
+                      last.content = fullResp;
+                      if (thinkingContent) {
+                        last.thinking = thinkingContent;
+                        last.thinkingDuration = thinkingDone
+                          ? (last.thinkingDuration || Math.round((Date.now() - thinkStartTime) / 1000))
+                          : Math.round((Date.now() - thinkStartTime) / 1000);
+                      }
+                    }
                     return updated;
                   });
                 }
@@ -451,6 +519,17 @@ function ChatPageInner() {
               }
             }
           }
+        }
+        // Finalize thinking duration
+        if (thinkingContent) {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last.role === "assistant" && last.thinking && !last.thinkingDuration) {
+              last.thinkingDuration = Math.round((Date.now() - thinkStartTime) / 1000);
+            }
+            return updated;
+          });
         }
         if (voiceEnabled && fullResp) playTTS(fullResp);
       } else {
@@ -507,12 +586,17 @@ function ChatPageInner() {
       .replace(
         /```(\w*)\n([\s\S]*?)```/g,
         (_match, lang: string, code: string) => {
+          const escaped = code.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const ext = lang === "python" ? "py" : lang === "javascript" ? "js" : lang === "typescript" ? "ts" : lang === "html" ? "html" : lang === "css" ? "css" : lang === "json" ? "json" : lang === "bash" || lang === "sh" ? "sh" : lang || "txt";
           return `<div class="code-block-wrapper my-3 rounded-xl overflow-hidden" style="background:rgba(8,8,20,0.6);border:1px solid var(--glass-border)">
                     <div class="flex items-center justify-between px-3 py-1.5" style="border-bottom:1px solid var(--glass-border);background:rgba(255,255,255,0.02)">
                         <span style="color:var(--text-ghost);font-size:0.65rem;font-weight:600;text-transform:uppercase">${lang || "code"}</span>
-                        <button class="copy-code-btn" style="color:var(--text-ghost);font-size:0.65rem;padding:2px 6px;border-radius:4px;cursor:pointer">Copy</button>
+                        <div class="flex items-center gap-1">
+                            <button class="download-code-btn" data-filename="code.${ext}" style="color:var(--text-ghost);font-size:0.65rem;padding:2px 6px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:3px" title="Download">↓ Download</button>
+                            <button class="copy-code-btn" style="color:var(--text-ghost);font-size:0.65rem;padding:2px 6px;border-radius:4px;cursor:pointer">Copy</button>
+                        </div>
                     </div>
-                    <pre style="margin:0;border:0;border-radius:0;background:transparent !important"><code class="language-${lang}">${code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>
+                    <pre style="margin:0;border:0;border-radius:0;background:transparent !important"><code class="language-${lang}">${escaped}</code></pre>
                 </div>`;
         },
       )
@@ -525,6 +609,42 @@ function ChatPageInner() {
       )
       .replace(/\n/g, "<br/>");
   };
+
+  // Event delegation for copy/download buttons in code blocks
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Copy button
+      if (target.closest(".copy-code-btn")) {
+        const wrapper = target.closest(".code-block-wrapper");
+        const code = wrapper?.querySelector("code")?.textContent || "";
+        navigator.clipboard.writeText(code);
+        const btn = target.closest(".copy-code-btn") as HTMLElement;
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+      }
+      // Download button
+      if (target.closest(".download-code-btn")) {
+        const wrapper = target.closest(".code-block-wrapper");
+        const code = wrapper?.querySelector("code")?.textContent || "";
+        const btn = target.closest(".download-code-btn") as HTMLElement;
+        const filename = btn.dataset.filename || "code.txt";
+        const blob = new Blob([code], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        btn.textContent = "✓ Downloaded";
+        setTimeout(() => { btn.innerHTML = "↓ Download"; }, 1500);
+      }
+    };
+    container.addEventListener("click", handler);
+    return () => container.removeEventListener("click", handler);
+  }, []);
 
   const getStepIcon = (type: string) => {
     switch (type) {
@@ -809,6 +929,61 @@ function ChatPageInner() {
                           <Sparkles size={14} color="white" />
                         </div>
                         <div className="flex-1 min-w-0">
+                          {/* Thinking block (LM Arena style) */}
+                          {(msg.thinking || (isStreaming && !msg.content && messages[messages.length - 1]?.id === msg.id)) && (
+                            <div
+                              className="mb-2 rounded-xl overflow-hidden animate-fade-in"
+                              style={{
+                                background: "rgba(139,92,246,0.04)",
+                                border: "1px solid rgba(139,92,246,0.15)",
+                              }}
+                            >
+                              <button
+                                onClick={() => setShowThinking((p) => ({ ...p, [msg.id]: !p[msg.id] }))}
+                                className="flex items-center gap-2 w-full px-3 py-2 text-left transition-colors hover:bg-white/[0.02]"
+                              >
+                                {msg.thinking && !msg.content && isStreaming && messages[messages.length - 1]?.id === msg.id ? (
+                                  <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "rgba(139,92,246,0.15)" }}>
+                                    <Brain size={11} className="animate-pulse" style={{ color: "var(--accent-violet)" }} />
+                                  </div>
+                                ) : (
+                                  <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "rgba(139,92,246,0.12)" }}>
+                                    <Brain size={11} style={{ color: "var(--accent-violet)" }} />
+                                  </div>
+                                )}
+                                <span className="text-[11px] font-semibold" style={{ color: "var(--accent-violet)" }}>
+                                  {msg.thinking && !msg.content && isStreaming && messages[messages.length - 1]?.id === msg.id
+                                    ? "Thinking..."
+                                    : `Thought for ${msg.thinkingDuration || 0}s`}
+                                </span>
+                                {msg.thinking && !msg.content && isStreaming && messages[messages.length - 1]?.id === msg.id && (
+                                  <Loader2 size={10} className="animate-spin" style={{ color: "var(--accent-violet)" }} />
+                                )}
+                                <div className="flex-1" />
+                                <ChevronDown
+                                  size={12}
+                                  className={`transition-transform ${showThinking[msg.id] ? "rotate-180" : ""}`}
+                                  style={{ color: "var(--text-ghost)" }}
+                                />
+                              </button>
+                              {showThinking[msg.id] && msg.thinking && (
+                                <div
+                                  className="px-3 pb-3 text-[12px] leading-relaxed animate-fade-in"
+                                  style={{
+                                    color: "var(--text-muted)",
+                                    borderTop: "1px solid rgba(139,92,246,0.1)",
+                                    maxHeight: "300px",
+                                    overflowY: "auto",
+                                    whiteSpace: "pre-wrap",
+                                    paddingTop: "8px",
+                                  }}
+                                >
+                                  {msg.thinking}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <div
                             className="rounded-2xl rounded-bl-lg px-4 py-3 text-[13px] leading-relaxed relative"
                             style={{

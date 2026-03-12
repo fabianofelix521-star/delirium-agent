@@ -74,7 +74,10 @@ export function Sidebar() {
   }, [fetchConversations]);
 
   const deleteConversation = (id: string) => {
-    fetch(`${API_BASE}/api/chat/conversations/${id}`, { method: "DELETE", headers: getAuthHeaders() })
+    fetch(`${API_BASE}/api/chat/conversations/${id}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    })
       .then(() => {
         setConversations((prev) => prev.filter((c) => c.id !== id));
         window.dispatchEvent(

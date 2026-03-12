@@ -57,7 +57,9 @@ export function Navbar() {
   );
 
   // Unique providers derived from models
-  const uniqueProviders = models.reduce<{ key: string; name: string; icon: string }[]>((acc, m) => {
+  const uniqueProviders = models.reduce<
+    { key: string; name: string; icon: string }[]
+  >((acc, m) => {
     if (!acc.find((p) => p.key === m.providerKey)) {
       acc.push({ key: m.providerKey, name: m.provider, icon: m.icon });
     }
@@ -65,11 +67,15 @@ export function Navbar() {
   }, []);
 
   // Models filtered by selected provider
-  const filteredModels = models.filter((m) => m.providerKey === selectedModel.providerKey);
+  const filteredModels = models.filter(
+    (m) => m.providerKey === selectedModel.providerKey,
+  );
 
   // Fetch providers/models from backend
   const fetchProviders = useCallback(() => {
-    fetch(`${API_BASE}/api/settings/providers/list`, { headers: getAuthHeaders() })
+    fetch(`${API_BASE}/api/settings/providers/list`, {
+      headers: getAuthHeaders(),
+    })
       .then((r) => r.json())
       .then(
         (
@@ -118,7 +124,8 @@ export function Navbar() {
     // Re-fetch when providers are updated from settings page
     const handler = () => fetchProviders();
     window.addEventListener("delirium-providers-updated", handler);
-    return () => window.removeEventListener("delirium-providers-updated", handler);
+    return () =>
+      window.removeEventListener("delirium-providers-updated", handler);
   }, [fetchProviders]);
 
   const pageTitle = () => {
@@ -180,10 +187,15 @@ export function Navbar() {
             <div className="relative">
               <button
                 className="model-selector"
-                onClick={() => { setProviderOpen(!providerOpen); setModelOpen(false); }}
+                onClick={() => {
+                  setProviderOpen(!providerOpen);
+                  setModelOpen(false);
+                }}
               >
                 <span>{selectedModel.icon}</span>
-                <span className="hidden sm:inline text-[11px]">{selectedModel.provider}</span>
+                <span className="hidden sm:inline text-[11px]">
+                  {selectedModel.provider}
+                </span>
                 <ChevronDown
                   size={11}
                   className={`transition-transform ${providerOpen ? "rotate-180" : ""}`}
@@ -209,12 +221,19 @@ export function Navbar() {
                         className="dropdown-item w-full text-left"
                         onClick={() => {
                           // Switch to first model of this provider
-                          const firstModel = models.find((m) => m.providerKey === prov.key);
+                          const firstModel = models.find(
+                            (m) => m.providerKey === prov.key,
+                          );
                           if (firstModel) {
                             setSelectedModel(firstModel);
-                            localStorage.setItem("delirium_selected_model", firstModel.id);
+                            localStorage.setItem(
+                              "delirium_selected_model",
+                              firstModel.id,
+                            );
                             window.dispatchEvent(
-                              new CustomEvent("delirium-model-change", { detail: firstModel }),
+                              new CustomEvent("delirium-model-change", {
+                                detail: firstModel,
+                              }),
                             );
                           }
                           setProviderOpen(false);
@@ -250,10 +269,19 @@ export function Navbar() {
             <div className="relative">
               <button
                 className="model-selector"
-                onClick={() => { setModelOpen(!modelOpen); setProviderOpen(false); }}
+                onClick={() => {
+                  setModelOpen(!modelOpen);
+                  setProviderOpen(false);
+                }}
               >
-                <span className="hidden sm:inline text-[11px]">{selectedModel.name}</span>
-                <span className="sm:hidden text-[11px]">{selectedModel.name.length > 16 ? selectedModel.name.slice(0, 16) + "…" : selectedModel.name}</span>
+                <span className="hidden sm:inline text-[11px]">
+                  {selectedModel.name}
+                </span>
+                <span className="sm:hidden text-[11px]">
+                  {selectedModel.name.length > 16
+                    ? selectedModel.name.slice(0, 16) + "…"
+                    : selectedModel.name}
+                </span>
                 <ChevronDown
                   size={11}
                   className={`transition-transform ${modelOpen ? "rotate-180" : ""}`}

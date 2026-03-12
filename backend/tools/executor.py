@@ -11,8 +11,12 @@ from urllib.parse import urlparse
 import httpx
 
 
-WORKSPACE = os.getenv("AGENT_WORKSPACE", os.path.expanduser("~/agent_workspace"))
-os.makedirs(WORKSPACE, exist_ok=True)
+WORKSPACE = os.getenv("AGENT_WORKSPACE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "workspace"))
+try:
+    os.makedirs(WORKSPACE, exist_ok=True)
+except OSError:
+    WORKSPACE = "/tmp/agent_workspace"
+    os.makedirs(WORKSPACE, exist_ok=True)
 
 # ── Tool Registry ────────────────────────────────────────
 

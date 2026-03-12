@@ -22,8 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create non-root user
-RUN groupadd -r delirium && useradd -r -g delirium delirium && \
-    mkdir -p /app/data && chown -R delirium:delirium /app
+RUN groupadd -r delirium && useradd -r -g delirium -d /home/delirium -m delirium && \
+    mkdir -p /app/data /app/data/workspace && chown -R delirium:delirium /app /home/delirium
 
 USER delirium
 

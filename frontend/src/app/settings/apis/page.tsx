@@ -602,7 +602,10 @@ export default function APIsPage() {
                 {isExpanded ? (
                   <ChevronUp size={14} style={{ color: "var(--text-ghost)" }} />
                 ) : (
-                  <ChevronDown size={14} style={{ color: "var(--text-ghost)" }} />
+                  <ChevronDown
+                    size={14}
+                    style={{ color: "var(--text-ghost)" }}
+                  />
                 )}
               </div>
 
@@ -622,7 +625,10 @@ export default function APIsPage() {
                         </label>
                         <input
                           type={field.type}
-                          placeholder={field.default || `Enter ${field.label.toLowerCase()}`}
+                          placeholder={
+                            field.default ||
+                            `Enter ${field.label.toLowerCase()}`
+                          }
                           value={integConfigs[integ.id]?.[field.key] || ""}
                           onChange={(e) =>
                             setIntegConfigs((prev) => ({

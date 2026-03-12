@@ -13,8 +13,14 @@ router = APIRouter()
 
 # ─── STT: Speech-to-Text ─────────────────────────────────
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+def _groq_key() -> str:
+    return os.getenv("GROQ_API_KEY", "")
+
+def _openai_key() -> str:
+    return os.getenv("OPENAI_API_KEY", "")
+
+def _elevenlabs_key() -> str:
+    return os.getenv("ELEVENLABS_API_KEY", "")
 
 
 @router.post("/stt")
@@ -27,12 +33,12 @@ async def speech_to_text(
     audio_bytes = await audio.read()
 
     if engine == "groq_whisper":
-        if not GROQ_API_KEY:
+        if not _groq_key():
             raise HTTPException(400, "GROQ_API_KEY not configured in .env")
         return await _stt_groq(audio_bytes, audio.filename or "audio.webm", language)
 
     elif engine == "openai_whisper":
-        if not OPENAI_API_KEY:
+        if not _openai_key():
             raise HTTPException(400, "OPENAI_API_KEY not configured in .env")
         return await _stt_openai(audio_bytes, audio.filename or "audio.webm", language)
 
@@ -45,7 +51,7 @@ async def _stt_groq(audio_bytes: bytes, filename: str, language: str) -> dict:
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
             "https://api.groq.com/openai/v1/audio/transcriptions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            headers={"Authorization": f"Bearer {_groq_key()}"},
             files={"file": (filename, audio_bytes)},
             data={"model": "whisper-large-v3-turbo", "language": language, "response_format": "json"},
         )
@@ -59,7 +65,7 @@ async def _stt_openai(audio_bytes: bytes, filename: str, language: str) -> dict:
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
             "https://api.openai.com/v1/audio/transcriptions",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+            headers={"Authorization": f"Bearer {_openai_key()}"},
             files={"file": (filename, audio_bytes)},
             data={"model": "whisper-1", "language": language, "response_format": "json"},
         )
@@ -69,8 +75,6 @@ async def _stt_openai(audio_bytes: bytes, filename: str, language: str) -> dict:
 
 
 # ─── TTS: Text-to-Speech ─────────────────────────────────
-
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 
 
 @router.post("/tts")
@@ -84,11 +88,11 @@ async def text_to_speech(
     if engine == "edge_tts":
         return await _tts_edge(text, voice, speed)
     elif engine == "elevenlabs":
-        if not ELEVENLABS_API_KEY:
+        if not _elevenlabs_key():
             raise HTTPException(400, "ELEVENLABS_API_KEY not configured in .env")
         return await _tts_elevenlabs(text, voice)
     elif engine == "openai_tts":
-        if not OPENAI_API_KEY:
+        if not _openai_key():
             raise HTTPException(400, "OPENAI_API_KEY not configured in .env")
         return await _tts_openai(text, voice, speed)
     else:
@@ -116,7 +120,7 @@ async def _tts_elevenlabs(text: str, voice_id: str) -> StreamingResponse:
         resp = await client.post(
             f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
             headers={
-                "xi-api-key": ELEVENLABS_API_KEY,
+                "xi-api-key": _elevenlabs_key(),
                 "Content-Type": "application/json",
             },
             json={
@@ -139,7 +143,7 @@ async def _tts_openai(text: str, voice: str, speed: float) -> StreamingResponse:
         resp = await client.post(
             "https://api.openai.com/v1/audio/speech",
             headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Authorization": f"Bearer {_openai_key()}",
                 "Content-Type": "application/json",
             },
             json={"model": "tts-1", "input": text, "voice": voice, "speed": speed},
@@ -160,7 +164,7 @@ async def voice_stream(websocket: WebSocket):
             data = await websocket.receive_bytes()
             # STT
             try:
-                transcript = await _stt_groq(data, "audio.webm", "pt") if GROQ_API_KEY else {"text": "[Configure GROQ_API_KEY for voice]"}
+                transcript = await _stt_groq(data, "audio.webm", "pt") if _groq_key() else {"text": "[Configure GROQ_API_KEY for voice]"}
                 await websocket.send_json({"type": "transcript", "text": transcript.get("text", "")})
             except Exception as e:
                 await websocket.send_json({"type": "error", "text": str(e)})
@@ -183,12 +187,12 @@ async def list_voice_engines() -> dict:
             {
                 "id": "groq_whisper", "name": "Groq Whisper",
                 "description": "Groq API — free 25 req/min, fast",
-                "free": True, "configured": bool(GROQ_API_KEY),
+                "free": True, "configured": bool(_groq_key()),
             },
             {
                 "id": "openai_whisper", "name": "OpenAI Whisper",
                 "description": "OpenAI Whisper API — best accuracy",
-                "free": False, "configured": bool(OPENAI_API_KEY),
+                "free": False, "configured": bool(_openai_key()),
             },
         ],
         "tts": [
@@ -200,12 +204,12 @@ async def list_voice_engines() -> dict:
             {
                 "id": "elevenlabs", "name": "ElevenLabs",
                 "description": "Premium AI voices — human-like quality",
-                "free": False, "configured": bool(ELEVENLABS_API_KEY),
+                "free": False, "configured": bool(_elevenlabs_key()),
             },
             {
                 "id": "openai_tts", "name": "OpenAI TTS",
                 "description": "OpenAI text-to-speech",
-                "free": False, "configured": bool(OPENAI_API_KEY),
+                "free": False, "configured": bool(_openai_key()),
             },
         ],
         "voices": [

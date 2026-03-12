@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback } from "react";
 import { API_BASE } from "@/lib/api";
 import {
   MessageCircle,
-  Mic,
   Wrench,
   Brain,
   LayoutDashboard,
@@ -28,7 +27,6 @@ import {
 const navItems = [
   { href: "/chat", label: "Chat", icon: MessageCircle },
   { href: "/code", label: "Code", icon: Code2 },
-  { href: "/voice", label: "Voice", icon: Mic },
   { href: "/preview", label: "Preview", icon: Monitor },
   { href: "/tools", label: "Tools", icon: Wrench },
   { href: "/memory", label: "Memory", icon: Brain },

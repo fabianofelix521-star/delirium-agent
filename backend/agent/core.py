@@ -1,6 +1,6 @@
 """
 Agent Core - Central orchestrator for the Delirium Infinite agent.
-Handles message processing, tool execution, and reasoning loops.
+Handles message processing, tool execution, reasoning loops, and multi-agent routing.
 """
 
 from __future__ import annotations
@@ -12,10 +12,11 @@ from typing import AsyncGenerator
 
 from providers.base import Message, LLMResponse
 from agent.router import router as llm_router
+from agent.agents import AGENTS, get_agent, get_agent_system_prompt
 from tools.executor import execute_tool, get_tools_for_prompt, TOOLS
 
 
-SYSTEM_PROMPT = """You are **Delirium Infinite** — an elite autonomous AI agent with REAL access to the user's computer, internet, GitHub, Supabase, and shell. You are more capable than ChatGPT, Claude, or any commercial assistant because you can actually *execute* actions, not just suggest them.
+DEFAULT_SYSTEM_PROMPT = """You are **Delirium Infinite** — an elite autonomous AI agent with REAL access to the user's computer, internet, GitHub, Supabase, and shell. You are more capable than ChatGPT, Claude, or any commercial assistant because you can actually *execute* actions, not just suggest them.
 
 ## Your Capabilities
 - **Execute code** (Python, Node.js, Bash) in real-time
@@ -25,6 +26,7 @@ SYSTEM_PROMPT = """You are **Delirium Infinite** — an elite autonomous AI agen
 - **GitHub integration** — list repos, create repos, read files, manage issues
 - **Supabase integration** — query tables, call RPC functions, manage storage
 - **Multi-step reasoning** — chain tools automatically until the task is complete
+- **Multi-agent system** — specialized agents for design, coding, research, and more
 
 ## Available Tools
 {tools_description}
@@ -58,6 +60,14 @@ The tool executes immediately and you receive the result. You can chain up to 10
 MAX_TOOL_ITERATIONS = 10
 
 
+def _build_system_prompt(agent_id: str | None = None) -> str:
+    """Build system prompt — from the agent registry or fallback to default."""
+    tools_desc = get_tools_for_prompt()
+    if agent_id and agent_id in AGENTS:
+        return get_agent_system_prompt(agent_id, tools_desc)
+    return DEFAULT_SYSTEM_PROMPT.format(tools_description=tools_desc)
+
+
 @dataclass
 class Conversation:
     """A conversation with message history."""
@@ -68,6 +78,7 @@ class Conversation:
     updated_at: float = field(default_factory=time.time)
     model: str = ""
     provider: str = ""
+    agent_id: str = ""
 
 
 class AgentOrchestrator:
@@ -96,14 +107,19 @@ class AgentOrchestrator:
         conversation_id: str = "default",
         provider: str | None = None,
         model: str | None = None,
+        agent_id: str | None = None,
     ) -> LLMResponse:
         """Process a user message and return the agent's response (non-streaming with tool loop)."""
         convo = self.get_or_create_conversation(conversation_id)
 
+        # Set or update agent for this conversation
+        if agent_id:
+            convo.agent_id = agent_id
+
         if not convo.messages:
             convo.messages.append(Message(
                 role="system",
-                content=SYSTEM_PROMPT.format(tools_description=get_tools_for_prompt()),
+                content=_build_system_prompt(convo.agent_id or agent_id),
             ))
 
         convo.messages.append(Message(role="user", content=message))
@@ -139,14 +155,19 @@ class AgentOrchestrator:
         conversation_id: str = "default",
         provider: str | None = None,
         model: str | None = None,
+        agent_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream a chat response with automatic tool execution loop."""
         convo = self.get_or_create_conversation(conversation_id)
 
+        # Set or update agent for this conversation
+        if agent_id:
+            convo.agent_id = agent_id
+
         if not convo.messages:
             convo.messages.append(Message(
                 role="system",
-                content=SYSTEM_PROMPT.format(tools_description=get_tools_for_prompt()),
+                content=_build_system_prompt(convo.agent_id or agent_id),
             ))
 
         convo.messages.append(Message(role="user", content=message))

@@ -307,6 +307,7 @@ function ChatPageInner() {
             ? `[Active modes: ${Array.from(activeModes).join(", ")}] `
             : "";
         const thinkStart = Date.now();
+        const selectedAgent = localStorage.getItem("delirium_active_agent") || undefined;
         const res = await fetch(`${API_BASE}/api/chat/send`, {
           method: "POST",
           headers: getAuthHeaders(),
@@ -316,6 +317,7 @@ function ChatPageInner() {
             stream: true,
             provider: activeProvider,
             model: activeModel,
+            agent_id: selectedAgent,
           }),
         });
         if (res.ok && res.body) {
@@ -345,16 +347,30 @@ function ChatPageInner() {
                     setConversationId(d.conversation_id);
                   if (d.type === "token") {
                     const tk = d.content;
-                    if (tk.includes("<think>")) { inThink = true; thinkBuf += (tk.split("<think>")[1] || ""); }
-                    else if (inThink && tk.includes("</think>")) { thinkBuf += tk.split("</think>")[0]; inThink = false; const r = tk.split("</think>")[1] || ""; if (r) fullResp += r; }
-                    else if (inThink) { thinkBuf += tk; }
-                    else { fullResp += tk; }
+                    if (tk.includes("<think>")) {
+                      inThink = true;
+                      thinkBuf += tk.split("<think>")[1] || "";
+                    } else if (inThink && tk.includes("</think>")) {
+                      thinkBuf += tk.split("</think>")[0];
+                      inThink = false;
+                      const r = tk.split("</think>")[1] || "";
+                      if (r) fullResp += r;
+                    } else if (inThink) {
+                      thinkBuf += tk;
+                    } else {
+                      fullResp += tk;
+                    }
                     setMessages((prev) => {
                       const u = [...prev];
                       const l = u[u.length - 1];
                       if (l.role === "assistant") {
                         l.content = fullResp;
-                        if (thinkBuf) { l.thinking = thinkBuf; l.thinkingDuration = Math.round((Date.now() - thinkStart) / 1000); }
+                        if (thinkBuf) {
+                          l.thinking = thinkBuf;
+                          l.thinkingDuration = Math.round(
+                            (Date.now() - thinkStart) / 1000,
+                          );
+                        }
                       }
                       return u;
                     });
@@ -429,6 +445,7 @@ function ChatPageInner() {
           ? `[Active modes: ${Array.from(activeModes).join(", ")}] `
           : "";
       const thinkStartTime = Date.now();
+      const voiceAgent = localStorage.getItem("delirium_active_agent") || undefined;
       const res = await fetch(`${API_BASE}/api/chat/send`, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -438,6 +455,7 @@ function ChatPageInner() {
           stream: true,
           provider: activeProvider,
           model: activeModel,
+          agent_id: voiceAgent,
         }),
       });
 
@@ -507,7 +525,8 @@ function ChatPageInner() {
                       if (thinkingContent) {
                         last.thinking = thinkingContent;
                         last.thinkingDuration = thinkingDone
-                          ? (last.thinkingDuration || Math.round((Date.now() - thinkStartTime) / 1000))
+                          ? last.thinkingDuration ||
+                            Math.round((Date.now() - thinkStartTime) / 1000)
                           : Math.round((Date.now() - thinkStartTime) / 1000);
                       }
                     }
@@ -525,8 +544,14 @@ function ChatPageInner() {
           setMessages((prev) => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
-            if (last.role === "assistant" && last.thinking && !last.thinkingDuration) {
-              last.thinkingDuration = Math.round((Date.now() - thinkStartTime) / 1000);
+            if (
+              last.role === "assistant" &&
+              last.thinking &&
+              !last.thinkingDuration
+            ) {
+              last.thinkingDuration = Math.round(
+                (Date.now() - thinkStartTime) / 1000,
+              );
             }
             return updated;
           });
@@ -587,7 +612,22 @@ function ChatPageInner() {
         /```(\w*)\n([\s\S]*?)```/g,
         (_match, lang: string, code: string) => {
           const escaped = code.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const ext = lang === "python" ? "py" : lang === "javascript" ? "js" : lang === "typescript" ? "ts" : lang === "html" ? "html" : lang === "css" ? "css" : lang === "json" ? "json" : lang === "bash" || lang === "sh" ? "sh" : lang || "txt";
+          const ext =
+            lang === "python"
+              ? "py"
+              : lang === "javascript"
+                ? "js"
+                : lang === "typescript"
+                  ? "ts"
+                  : lang === "html"
+                    ? "html"
+                    : lang === "css"
+                      ? "css"
+                      : lang === "json"
+                        ? "json"
+                        : lang === "bash" || lang === "sh"
+                          ? "sh"
+                          : lang || "txt";
           return `<div class="code-block-wrapper my-3 rounded-xl overflow-hidden" style="background:rgba(8,8,20,0.6);border:1px solid var(--glass-border)">
                     <div class="flex items-center justify-between px-3 py-1.5" style="border-bottom:1px solid var(--glass-border);background:rgba(255,255,255,0.02)">
                         <span style="color:var(--text-ghost);font-size:0.65rem;font-weight:600;text-transform:uppercase">${lang || "code"}</span>
@@ -623,7 +663,9 @@ function ChatPageInner() {
         navigator.clipboard.writeText(code);
         const btn = target.closest(".copy-code-btn") as HTMLElement;
         btn.textContent = "Copied!";
-        setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+        setTimeout(() => {
+          btn.textContent = "Copy";
+        }, 1500);
       }
       // Download button
       if (target.closest(".download-code-btn")) {
@@ -639,7 +681,9 @@ function ChatPageInner() {
         a.click();
         URL.revokeObjectURL(url);
         btn.textContent = "✓ Downloaded";
-        setTimeout(() => { btn.innerHTML = "↓ Download"; }, 1500);
+        setTimeout(() => {
+          btn.innerHTML = "↓ Download";
+        }, 1500);
       }
     };
     container.addEventListener("click", handler);
@@ -930,7 +974,11 @@ function ChatPageInner() {
                         </div>
                         <div className="flex-1 min-w-0">
                           {/* Thinking block (LM Arena style) */}
-                          {(msg.thinking || (isStreaming && !msg.content && messages[messages.length - 1]?.id === msg.id)) && (
+                          {(msg.thinking ||
+                            (isStreaming &&
+                              !msg.content &&
+                              messages[messages.length - 1]?.id ===
+                                msg.id)) && (
                             <div
                               className="mb-2 rounded-xl overflow-hidden animate-fade-in"
                               style={{
@@ -939,26 +987,65 @@ function ChatPageInner() {
                               }}
                             >
                               <button
-                                onClick={() => setShowThinking((p) => ({ ...p, [msg.id]: !p[msg.id] }))}
+                                onClick={() =>
+                                  setShowThinking((p) => ({
+                                    ...p,
+                                    [msg.id]: !p[msg.id],
+                                  }))
+                                }
                                 className="flex items-center gap-2 w-full px-3 py-2 text-left transition-colors hover:bg-white/[0.02]"
                               >
-                                {msg.thinking && !msg.content && isStreaming && messages[messages.length - 1]?.id === msg.id ? (
-                                  <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "rgba(139,92,246,0.15)" }}>
-                                    <Brain size={11} className="animate-pulse" style={{ color: "var(--accent-violet)" }} />
+                                {msg.thinking &&
+                                !msg.content &&
+                                isStreaming &&
+                                messages[messages.length - 1]?.id === msg.id ? (
+                                  <div
+                                    className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                                    style={{
+                                      background: "rgba(139,92,246,0.15)",
+                                    }}
+                                  >
+                                    <Brain
+                                      size={11}
+                                      className="animate-pulse"
+                                      style={{ color: "var(--accent-violet)" }}
+                                    />
                                   </div>
                                 ) : (
-                                  <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "rgba(139,92,246,0.12)" }}>
-                                    <Brain size={11} style={{ color: "var(--accent-violet)" }} />
+                                  <div
+                                    className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                                    style={{
+                                      background: "rgba(139,92,246,0.12)",
+                                    }}
+                                  >
+                                    <Brain
+                                      size={11}
+                                      style={{ color: "var(--accent-violet)" }}
+                                    />
                                   </div>
                                 )}
-                                <span className="text-[11px] font-semibold" style={{ color: "var(--accent-violet)" }}>
-                                  {msg.thinking && !msg.content && isStreaming && messages[messages.length - 1]?.id === msg.id
+                                <span
+                                  className="text-[11px] font-semibold"
+                                  style={{ color: "var(--accent-violet)" }}
+                                >
+                                  {msg.thinking &&
+                                  !msg.content &&
+                                  isStreaming &&
+                                  messages[messages.length - 1]?.id === msg.id
                                     ? "Thinking..."
                                     : `Thought for ${msg.thinkingDuration || 0}s`}
                                 </span>
-                                {msg.thinking && !msg.content && isStreaming && messages[messages.length - 1]?.id === msg.id && (
-                                  <Loader2 size={10} className="animate-spin" style={{ color: "var(--accent-violet)" }} />
-                                )}
+                                {msg.thinking &&
+                                  !msg.content &&
+                                  isStreaming &&
+                                  messages[messages.length - 1]?.id ===
+                                    msg.id && (
+                                    <Loader2
+                                      size={10}
+                                      className="animate-spin"
+                                      style={{ color: "var(--accent-violet)" }}
+                                    />
+                                  )}
                                 <div className="flex-1" />
                                 <ChevronDown
                                   size={12}

@@ -20,6 +20,7 @@ class ChatRequest(BaseModel):
     provider: Optional[str] = None
     model: Optional[str] = None
     stream: bool = True
+    agent_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -44,6 +45,7 @@ async def send_message(request: ChatRequest):
                     conversation_id=conversation_id,
                     provider=request.provider,
                     model=request.model,
+                    agent_id=request.agent_id,
                 ):
                     yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"
@@ -57,6 +59,7 @@ async def send_message(request: ChatRequest):
             conversation_id=conversation_id,
             provider=request.provider,
             model=request.model,
+            agent_id=request.agent_id,
         )
         return ChatResponse(
             content=response.content,

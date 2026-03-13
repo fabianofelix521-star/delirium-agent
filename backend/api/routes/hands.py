@@ -461,6 +461,385 @@ HANDS: list[dict] = [
         ],
         "settings": {"channels": ["email", "telegram"], "quiet_hours": "22:00-08:00", "batch_similar": True},
     },
+    # ── New Specialized Hands (site/app dev, research, biohacking) ────
+    {
+        "id": "pesquisa-papers",
+        "name": "Pesquisa Papers Hand",
+        "icon": "📚",
+        "description": "Pesquisa autônoma de artigos científicos — busca no PubMed, arXiv, Google Scholar, extrai dados e gera resumos estruturados",
+        "category": "research",
+        "tools": [
+            "web_search", "web_fetch", "extract_abstract", "summarize_paper",
+            "cite_sources", "file_write", "file_read", "memory_store",
+            "memory_recall",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Papers Found", "type": "number"},
+            {"name": "Abstracts Extracted", "type": "number"},
+            {"name": "Summaries Generated", "type": "number"},
+        ],
+        "settings": {"max_results": 20, "sources": ["pubmed", "arxiv", "scholar"], "language": "auto"},
+    },
+    {
+        "id": "gerar-codigo-web",
+        "name": "Gerar Código Web Hand",
+        "icon": "🌐",
+        "description": "Geração autônoma de código web — HTML, CSS, JS, React, Next.js, Tailwind com preview e deploy-ready",
+        "category": "development",
+        "tools": [
+            "write_file", "read_file", "edit_file", "shell", "python",
+            "web_search", "file_write", "file_read", "generate_ui_component",
+            "create_project",
+        ],
+        "requirements": [
+            {"label": "Node.js must be installed", "check": "node", "met": True},
+        ],
+        "metrics": [
+            {"name": "Components Generated", "type": "number"},
+            {"name": "Pages Created", "type": "number"},
+            {"name": "Lines of Code", "type": "number"},
+        ],
+        "settings": {"framework": "nextjs", "styling": "tailwind", "typescript": True},
+    },
+    {
+        "id": "debug-codigo",
+        "name": "Debug Código Hand",
+        "icon": "🐛",
+        "description": "Debugger autônomo — analisa erros, identifica root cause, sugere e aplica fixes com explicação detalhada",
+        "category": "development",
+        "tools": [
+            "read_file", "edit_file", "shell", "python", "web_search",
+            "file_write", "file_read", "analyze", "generate_report",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Bugs Fixed", "type": "number"},
+            {"name": "Root Causes Found", "type": "number"},
+            {"name": "Files Analyzed", "type": "number"},
+        ],
+        "settings": {"auto_fix": False, "explain_fix": True, "run_tests_after": True},
+    },
+    {
+        "id": "gerar-prototipo-app",
+        "name": "Gerar Protótipo App Hand",
+        "icon": "📱",
+        "description": "Prototipagem rápida — gera wireframes, fluxos de navegação e código base para apps mobile e web",
+        "category": "creative",
+        "tools": [
+            "generate_ui_component", "design_layout", "create_project",
+            "write_file", "file_write", "file_read", "web_search",
+            "shell",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Prototypes Created", "type": "number"},
+            {"name": "Screens Designed", "type": "number"},
+            {"name": "Flows Mapped", "type": "number"},
+        ],
+        "settings": {"platform": "web", "style": "liquid-glass", "include_navigation": True},
+    },
+    {
+        "id": "gerar-imagem-site",
+        "name": "Gerar Imagem Site Hand",
+        "icon": "🖼️",
+        "description": "Geração de imagens para sites e apps via MiniMax — banners, hero images, ícones, backgrounds e assets visuais",
+        "category": "creative",
+        "tools": [
+            "generate_image", "web_search", "file_write", "file_read",
+            "memory_store", "memory_recall",
+        ],
+        "requirements": [
+            {"label": "MiniMax API key must be configured", "check": "env:MINIMAX_API_KEY", "met": False},
+        ],
+        "metrics": [
+            {"name": "Images Generated", "type": "number"},
+            {"name": "Styles Applied", "type": "number"},
+            {"name": "Assets Created", "type": "number"},
+        ],
+        "settings": {"model": "minimax", "resolution": "1024x1024", "style": "modern"},
+    },
+    {
+        "id": "gerar-voz-narracao",
+        "name": "Gerar Voz Narração Hand",
+        "icon": "🎙️",
+        "description": "Text-to-speech autônomo via MiniMax — gera narrações, voiceovers, podcasts e áudio para conteúdo",
+        "category": "content",
+        "tools": [
+            "generate_voice", "web_search", "file_write", "file_read",
+            "memory_store", "memory_recall",
+        ],
+        "requirements": [
+            {"label": "MiniMax API key must be configured", "check": "env:MINIMAX_API_KEY", "met": False},
+        ],
+        "metrics": [
+            {"name": "Audio Generated", "type": "number"},
+            {"name": "Minutes of Audio", "type": "number"},
+            {"name": "Voices Used", "type": "number"},
+        ],
+        "settings": {"model": "minimax-tts", "voice": "narrator", "language": "pt-BR"},
+    },
+    {
+        "id": "web-search-hand",
+        "name": "Web Search Hand",
+        "icon": "🔍",
+        "description": "Busca web profunda e autônoma — pesquisa, filtra, cruza fontes e gera relatórios estruturados com citações",
+        "category": "research",
+        "tools": [
+            "web_search", "web_fetch", "deep_dive", "cross_reference",
+            "cite_sources", "file_write", "file_read", "memory_store",
+            "memory_recall",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Searches Made", "type": "number"},
+            {"name": "Sources Found", "type": "number"},
+            {"name": "Reports Generated", "type": "number"},
+        ],
+        "settings": {"max_results": 30, "depth": "deep", "include_citations": True},
+    },
+    {
+        "id": "seo-copy",
+        "name": "SEO Copy Hand",
+        "icon": "📝",
+        "description": "Copywriting SEO autônomo — gera textos otimizados para buscadores, meta tags, ads copy e landing pages",
+        "category": "content",
+        "tools": [
+            "seo_optimize", "write_article", "generate_outline",
+            "web_search", "file_write", "file_read", "memory_store",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Copies Written", "type": "number"},
+            {"name": "Keywords Optimized", "type": "number"},
+            {"name": "SEO Score", "type": "number"},
+        ],
+        "settings": {"tone": "persuasive", "max_length": 3000, "target_keyword_density": 0.02},
+    },
+    {
+        "id": "deploy-simulacao",
+        "name": "Deploy Simulação Hand",
+        "icon": "🚀",
+        "description": "Simulação de deploy — valida configuração, testa Dockerfiles, simula CI/CD pipelines e gera checklists de deploy",
+        "category": "development",
+        "tools": [
+            "shell", "manage_docker", "configure_ci", "deploy_app",
+            "file_write", "file_read", "generate_report",
+        ],
+        "requirements": [
+            {"label": "Docker must be installed", "check": "docker", "met": True},
+        ],
+        "metrics": [
+            {"name": "Deploys Simulated", "type": "number"},
+            {"name": "Issues Found", "type": "number"},
+            {"name": "Checklists Generated", "type": "number"},
+        ],
+        "settings": {"target": "railway", "validate_dockerfile": True, "dry_run": True},
+    },
+    {
+        "id": "ui-design-sugestao",
+        "name": "UI Design Sugestão Hand",
+        "icon": "🎯",
+        "description": "Consultoria de UI/UX — analisa layouts, sugere melhorias de usabilidade, acessibilidade e design patterns",
+        "category": "creative",
+        "tools": [
+            "generate_ui_component", "design_layout", "create_palette",
+            "web_search", "file_write", "file_read", "web_fetch",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Suggestions Made", "type": "number"},
+            {"name": "Layouts Reviewed", "type": "number"},
+            {"name": "A11y Issues Found", "type": "number"},
+        ],
+        "settings": {"style": "liquid-glass", "check_accessibility": True, "responsive": True},
+    },
+    {
+        "id": "mobile-responsivo",
+        "name": "Mobile Responsivo Hand",
+        "icon": "📲",
+        "description": "Especialista em responsividade — converte layouts desktop para mobile, otimiza CSS e testa breakpoints",
+        "category": "development",
+        "tools": [
+            "read_file", "edit_file", "write_file", "shell",
+            "generate_ui_component", "file_write", "file_read",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Components Adapted", "type": "number"},
+            {"name": "Breakpoints Tested", "type": "number"},
+            {"name": "CSS Lines Optimized", "type": "number"},
+        ],
+        "settings": {"breakpoints": ["sm", "md", "lg", "xl"], "framework": "tailwind", "mobile_first": True},
+    },
+    {
+        "id": "database-setup",
+        "name": "Database Setup Hand",
+        "icon": "🗄️",
+        "description": "Arquiteto de banco de dados — cria schemas SQL/NoSQL, migrations, seeds, RLS policies e otimiza queries",
+        "category": "data",
+        "tools": [
+            "shell", "python", "write_file", "file_write", "file_read",
+            "web_search", "generate_report",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Tables Created", "type": "number"},
+            {"name": "Migrations Generated", "type": "number"},
+            {"name": "Queries Optimized", "type": "number"},
+        ],
+        "settings": {"db_type": "postgresql", "orm": "supabase", "enable_rls": True},
+    },
+    {
+        "id": "api-integracao",
+        "name": "API Integração Hand",
+        "icon": "🔗",
+        "description": "Integrador de APIs — gera código de integração, testa endpoints, trata erros e documenta conexões",
+        "category": "development",
+        "tools": [
+            "web_search", "web_fetch", "write_file", "shell", "python",
+            "file_write", "file_read", "generate_report",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "APIs Integrated", "type": "number"},
+            {"name": "Endpoints Connected", "type": "number"},
+            {"name": "Tests Passed", "type": "number"},
+        ],
+        "settings": {"auth_type": "bearer", "retry_on_error": True, "generate_types": True},
+    },
+    {
+        "id": "teste-automatizado",
+        "name": "Teste Automatizado Hand",
+        "icon": "✅",
+        "description": "Gerador de testes autônomos — cria suites Jest, Cypress, Pytest com cobertura e relatórios",
+        "category": "development",
+        "tools": [
+            "write_file", "read_file", "shell", "python",
+            "generate_tests", "run_suite", "check_coverage",
+            "file_write", "file_read",
+        ],
+        "requirements": [
+            {"label": "Node.js must be installed", "check": "node", "met": True},
+        ],
+        "metrics": [
+            {"name": "Tests Generated", "type": "number"},
+            {"name": "Tests Passed", "type": "number"},
+            {"name": "Coverage %", "type": "percent"},
+        ],
+        "settings": {"framework": "jest", "min_coverage": 80, "include_e2e": False},
+    },
+    {
+        "id": "otimizar-performance",
+        "name": "Otimizar Performance Hand",
+        "icon": "⚡",
+        "description": "Otimizador de performance — analisa bundle size, lazy loading, caching, Core Web Vitals e sugere melhorias",
+        "category": "development",
+        "tools": [
+            "read_file", "edit_file", "shell", "python", "web_search",
+            "analyze", "generate_report", "file_write", "file_read",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Issues Found", "type": "number"},
+            {"name": "Fixes Applied", "type": "number"},
+            {"name": "Performance Score", "type": "number"},
+        ],
+        "settings": {"target_lcp": 2.5, "target_fid": 100, "target_cls": 0.1, "auto_fix": False},
+    },
+    {
+        "id": "gerar-readme",
+        "name": "Gerar README Hand",
+        "icon": "📄",
+        "description": "Gerador de documentação — cria README.md completo, badges, setup instructions, API docs e contributing guide",
+        "category": "content",
+        "tools": [
+            "read_file", "write_file", "file_write", "file_read",
+            "web_search", "shell",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "READMEs Generated", "type": "number"},
+            {"name": "Sections Written", "type": "number"},
+            {"name": "Badges Added", "type": "number"},
+        ],
+        "settings": {"include_badges": True, "include_api_docs": True, "include_screenshots": False},
+    },
+    {
+        "id": "marketing-landing",
+        "name": "Marketing Landing Hand",
+        "icon": "🎪",
+        "description": "Criador de landing pages — gera hero sections, CTAs, testimonials, pricing tables e copy persuasivo",
+        "category": "creative",
+        "tools": [
+            "generate_ui_component", "write_file", "seo_optimize",
+            "create_palette", "web_search", "file_write", "file_read",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Landings Created", "type": "number"},
+            {"name": "CTAs Generated", "type": "number"},
+            {"name": "Conversion Score", "type": "number"},
+        ],
+        "settings": {"style": "liquid-glass", "include_pricing": True, "include_testimonials": True},
+    },
+    {
+        "id": "video-teaser",
+        "name": "Video Teaser Hand",
+        "icon": "🎬",
+        "description": "Roteirista de vídeo — cria scripts para teasers, reels, shorts, storyboards e prompts para geração de vídeo",
+        "category": "content",
+        "tools": [
+            "write_article", "generate_outline", "web_search",
+            "file_write", "file_read", "memory_store",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Scripts Written", "type": "number"},
+            {"name": "Storyboards Created", "type": "number"},
+            {"name": "Duration (sec)", "type": "number"},
+        ],
+        "settings": {"format": "short", "max_duration_sec": 60, "platform": "instagram"},
+    },
+    {
+        "id": "bio-simulacao",
+        "name": "Bio Simulação Hand",
+        "icon": "🧬",
+        "description": "Simulador biológico — executa análises com BioPython, RDKit, simulações moleculares e modelagem bioinformática",
+        "category": "research",
+        "tools": [
+            "python", "shell", "web_search", "web_fetch",
+            "file_write", "file_read", "memory_store", "memory_recall",
+            "generate_report",
+        ],
+        "requirements": [],
+        "metrics": [
+            {"name": "Simulations Run", "type": "number"},
+            {"name": "Molecules Analyzed", "type": "number"},
+            {"name": "Reports Generated", "type": "number"},
+        ],
+        "settings": {"engine": "biopython", "output_format": "html", "save_results": True},
+    },
+    {
+        "id": "imagem-molecula",
+        "name": "Imagem Molécula Hand",
+        "icon": "⚗️",
+        "description": "Gerador de imagens moleculares — cria visualizações de moléculas, estruturas químicas e diagramas bio via MiniMax",
+        "category": "research",
+        "tools": [
+            "generate_image", "python", "web_search",
+            "file_write", "file_read", "memory_store",
+        ],
+        "requirements": [
+            {"label": "MiniMax API key must be configured", "check": "env:MINIMAX_API_KEY", "met": False},
+        ],
+        "metrics": [
+            {"name": "Molecules Rendered", "type": "number"},
+            {"name": "Structures Visualized", "type": "number"},
+            {"name": "Images Exported", "type": "number"},
+        ],
+        "settings": {"model": "minimax", "resolution": "1024x1024", "style": "scientific"},
+    },
 ]
 
 # ── In-memory state ──────────────────────────────────────
@@ -542,25 +921,33 @@ class HandRunRequest(BaseModel):
 def _build_hand_system_prompt(hand: dict) -> str:
     """Build a system prompt tailored to a specific hand."""
     tools_list = ", ".join(hand["tools"])
-    return f"""You are the **{hand['name']}** ({hand['icon']}) — an autonomous AI hand in the Delirium Infinite system.
+    return f"""You are the **{hand['name']}** ({hand['icon']}) — a Hand (ferramenta real) do **Delirium Infinite**, o agente bio-cientista louco autônomo.
 
-## Your Mission
+## Identidade
+Você faz parte do sistema Delirium Infinite — um agente autônomo com Hands (ferramentas reais) para criar sites, apps, pesquisa científica e biohacking. Cada Hand é um módulo especializado que executa tarefas reais.
+
+## Sua Missão
 {hand['description']}
 
-## Available Tools
-You have access to these tools: {tools_list}
+## Tools Disponíveis
+{tools_list}
 
-When you need to use a tool, respond with ONLY a JSON object:
+Quando precisar usar uma tool, responda com JSON:
 ```json
-{{"tool": "tool_name", "args": {{"param": "value"}}}}
+{{"tool": "nome_da_tool", "param": "valor"}}
 ```
 
-## Rules
-1. Be proactive and autonomous — complete the task without asking for clarification
-2. Use your tools to gather real data and take real actions
-3. Report your progress and findings clearly
-4. Match the user's language (Portuguese if they speak Portuguese)
-5. If a tool isn't available, use alternatives (web_search, shell, python)
+## Regras de Execução
+1. **Raciocínio passo a passo** — pense antes de agir, explique cada step
+2. **Máximo 8 steps por thread** — se precisar de mais, resuma e continue em novo bloco
+3. **Anti-lock reasoning** — se travar em loop, pare, resuma o que tentou e mude de abordagem
+4. **1-2 tools por chamada** — use no máximo 2 tools por resposta para manter controle
+5. **Sempre termine com resumo**: "Tools usadas: X | Próximo passo: Y"
+6. **Priorize ação real** — execute tarefas de verdade, não apenas explique
+7. **Match language** — responda no idioma do usuário (português se falar português)
+8. **Se a tool não existir, crie** — use shell/python para criar a ferramenta necessária
+9. **Para sites/apps** — priorize código funcional e deploy-ready
+10. **Para pesquisa/bio** — use fontes reais (PubMed, arXiv) e dados verificáveis
 """
 
 

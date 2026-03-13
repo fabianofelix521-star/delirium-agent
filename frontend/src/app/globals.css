@@ -5,18 +5,18 @@
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  /* ─── Core Palette ─────────────────────────────── */
-  --bg-void: #050508;
-  --bg-primary: #0a0a12;
-  --bg-secondary: #0e0e1a;
-  --bg-tertiary: #141422;
-  --bg-elevated: #1a1a2e;
+  /* ─── Core Palette (VS Code–neutral dark) ──────── */
+  --bg-void: #0e0e0e;
+  --bg-primary: #141414;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #222222;
+  --bg-elevated: #2a2a2a;
 
   /* ─── Liquid Glass ─────────────────────────────── */
-  --glass-bg: rgba(16, 16, 32, 0.45);
-  --glass-bg-solid: rgba(18, 18, 35, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-border-hover: rgba(255, 255, 255, 0.12);
+  --glass-bg: rgba(22, 22, 22, 0.52);
+  --glass-bg-solid: rgba(26, 26, 26, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-border-hover: rgba(255, 255, 255, 0.14);
   --glass-shine: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.08) 0%,
@@ -64,10 +64,10 @@
 
 /* ─── Light Theme ──────────────────────────────────── */
 [data-theme="light"] {
-  --bg-void: #e8eaf2;
-  --bg-primary: #f0f2f8;
-  --bg-secondary: #f8f9fc;
-  --bg-tertiary: #e4e6f0;
+  --bg-void: #eaeaea;
+  --bg-primary: #f2f2f2;
+  --bg-secondary: #f9f9f9;
+  --bg-tertiary: #e6e6e6;
   --bg-elevated: #ffffff;
   --glass-bg: rgba(255, 255, 255, 0.65);
   --glass-bg-solid: rgba(255, 255, 255, 0.9);
@@ -80,10 +80,10 @@
   );
   --glass-shadow:
     0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  --text-primary: #111122;
-  --text-secondary: #3d3d60;
-  --text-muted: #5c5c7a;
-  --text-ghost: #8888a8;
+  --text-primary: #111111;
+  --text-secondary: #3d3d3d;
+  --text-muted: #5c5c5c;
+  --text-ghost: #888888;
   --accent-glow:
     0 0 40px rgba(99, 102, 241, 0.08), 0 0 80px rgba(139, 92, 246, 0.04);
   --accent-glow-strong:
@@ -123,17 +123,17 @@ body::before {
   background:
     radial-gradient(
       ellipse 60% 50% at 20% 20%,
-      rgba(99, 102, 241, 0.06),
+      rgba(99, 102, 241, 0.04),
       transparent
     ),
     radial-gradient(
       ellipse 50% 40% at 80% 80%,
-      rgba(168, 85, 247, 0.04),
+      rgba(168, 85, 247, 0.03),
       transparent
     ),
     radial-gradient(
       ellipse 40% 30% at 50% 50%,
-      rgba(6, 182, 212, 0.03),
+      rgba(6, 182, 212, 0.02),
       transparent
     );
   pointer-events: none;

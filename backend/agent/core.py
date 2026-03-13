@@ -236,13 +236,15 @@ class AgentOrchestrator:
     @staticmethod
     def _extract_tool_call(text: str) -> dict | None:
         """Try to extract a tool call JSON from the LLM response."""
+        # Strip <think> blocks so tool calls aren't hidden inside them
+        cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
         patterns = [
             r'```json\s*(\{[^`]*"tool"[^`]*\})\s*```',
             r'```\s*(\{[^`]*"tool"[^`]*\})\s*```',
             r'(\{[^{}]*"tool"\s*:\s*"[^"]*"[^{}]*\})',
         ]
         for pattern in patterns:
-            match = re.search(pattern, text, re.DOTALL)
+            match = re.search(pattern, cleaned, re.DOTALL)
             if match:
                 try:
                     data = json.loads(match.group(1))

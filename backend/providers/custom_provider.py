@@ -26,14 +26,18 @@ class CustomProvider(BaseProvider):
         return headers
 
     async def chat(self, messages: list[Message], model: str | None = None,
-                   temperature: float = 0.7, max_tokens: int = 4096) -> LLMResponse:
+                   temperature: float = 0.7, max_tokens: int = 8192) -> LLMResponse:
         model = model or self.default_model
-        async with httpx.AsyncClient(timeout=120) as client:
+        payload: dict = {"model": model, "messages": [{"role": m.role, "content": m.content} for m in messages],
+                      "temperature": temperature, "max_tokens": max_tokens}
+        # Qwen3 thinking support: use thinking budget to reduce latency
+        if "qwen3" in (model or "").lower():
+            payload["extra_body"] = {"enable_thinking": True, "thinking_budget": 1024}
+        async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(
                 f"{self.base_url}/chat/completions",
                 headers=self._headers(),
-                json={"model": model, "messages": [{"role": m.role, "content": m.content} for m in messages],
-                      "temperature": temperature, "max_tokens": max_tokens},
+                json=payload,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -44,13 +48,16 @@ class CustomProvider(BaseProvider):
             )
 
     async def stream(self, messages: list[Message], model: str | None = None,
-                     temperature: float = 0.7, max_tokens: int = 4096) -> AsyncGenerator[str, None]:
+                     temperature: float = 0.7, max_tokens: int = 8192) -> AsyncGenerator[str, None]:
         model = model or self.default_model
-        async with httpx.AsyncClient(timeout=120) as client:
+        payload: dict = {"model": model, "messages": [{"role": m.role, "content": m.content} for m in messages],
+                      "temperature": temperature, "max_tokens": max_tokens, "stream": True}
+        if "qwen3" in (model or "").lower():
+            payload["extra_body"] = {"enable_thinking": True, "thinking_budget": 1024}
+        async with httpx.AsyncClient(timeout=180) as client:
             async with client.stream(
                 "POST", f"{self.base_url}/chat/completions", headers=self._headers(),
-                json={"model": model, "messages": [{"role": m.role, "content": m.content} for m in messages],
-                      "temperature": temperature, "max_tokens": max_tokens, "stream": True},
+                json=payload,
             ) as resp:
                 if resp.status_code != 200:
                     body = await resp.aread()

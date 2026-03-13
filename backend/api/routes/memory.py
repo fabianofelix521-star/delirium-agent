@@ -48,6 +48,13 @@ class MemoryEntry(BaseModel):
     metadata: dict = {}
 
 
+@router.get("")
+@router.get("/")
+async def list_memories():
+    """List all memories."""
+    return _load_memories()
+
+
 @router.get("/search")
 async def search_memory(q: str = "", type: str | None = None, limit: int = 50) -> list[dict]:
     """Search agent memory."""

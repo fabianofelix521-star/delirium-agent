@@ -39,7 +39,9 @@ export default function SessionsPage() {
   }, [filter]);
 
   const fetchMemories = useCallback(() => {
-    fetch(`${API_BASE}/api/memory`, { headers: getAuthHeaders() })
+    fetch(`${API_BASE}/api/memory/search?query=&limit=50`, {
+      headers: getAuthHeaders(),
+    })
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d)) setMemories(d);

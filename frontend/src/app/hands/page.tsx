@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { API_BASE, getAuthHeaders } from "@/lib/api";
 import {
   Loader2,
@@ -9,6 +9,8 @@ import {
   X,
   CheckCircle2,
   XCircle,
+  Send,
+  Terminal,
 } from "lucide-react";
 
 /* ─── Types ──────────────────────────────────── */
@@ -47,6 +49,10 @@ export default function HandsPage() {
     "available",
   );
   const [detailHand, setDetailHand] = useState<HandItem | null>(null);
+  const [runOutput, setRunOutput] = useState<string>("");
+  const [runTask, setRunTask] = useState<string>("");
+  const [runHand_active, setRunHandActive] = useState<HandItem | null>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
 
   const fetchHands = () => {
     fetch(`${API_BASE}/api/hands`, { headers: getAuthHeaders() })
@@ -95,13 +101,54 @@ export default function HandsPage() {
     }
   };
 
-  const runHand = async (id: string) => {
+  const runHand = async (id: string, task?: string) => {
     setRunning(id);
+    setRunOutput("");
+    const hand = hands.find((h) => h.id === id);
+    if (hand) setRunHandActive(hand);
+
     try {
-      await fetch(`${API_BASE}/api/hands/${id}/run`, {
+      const res = await fetch(`${API_BASE}/api/hands/${id}/run`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ task: task || "" }),
       });
+
+      if (res.ok && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let fullResp = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === "token") {
+                  fullResp += data.content;
+                  setRunOutput(fullResp);
+                  outputRef.current?.scrollTo(
+                    0,
+                    outputRef.current.scrollHeight,
+                  );
+                } else if (data.type === "error") {
+                  fullResp += `\n\n❌ Error: ${data.message}`;
+                  setRunOutput(fullResp);
+                }
+              } catch {
+                /* skip */
+              }
+            }
+          }
+        }
+      }
+
       setHands((prev) =>
         prev.map((h) =>
           h.id === id
@@ -116,7 +163,7 @@ export default function HandsPage() {
         ),
       );
     } catch {
-      /* */
+      setRunOutput("⚡ Failed to connect to backend.");
     }
     setRunning(null);
   };
@@ -343,6 +390,66 @@ export default function HandsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ─── Run Output Panel ─── */}
+      {(runHand_active || runOutput) && (
+        <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-2xl p-5 backdrop-blur-xl">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-[var(--accent-cyan)]" />
+              {runHand_active
+                ? `${runHand_active.icon} ${runHand_active.name}`
+                : "Hand Output"}
+              {running && (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--accent-cyan)]" />
+              )}
+            </h3>
+            <button
+              onClick={() => {
+                setRunHandActive(null);
+                setRunOutput("");
+                setRunTask("");
+              }}
+              className="p-1 rounded-lg hover:bg-[var(--hover-bg)] text-[var(--text-ghost)]"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {/* Task input */}
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={runTask}
+              onChange={(e) => setRunTask(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && runHand_active && !running) {
+                  runHand(runHand_active.id, runTask);
+                }
+              }}
+              placeholder="Give a task to this hand (or leave empty for default)..."
+              className="flex-1 px-3 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--glass-border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] focus:outline-none focus:border-[var(--accent-cyan)]"
+            />
+            <button
+              onClick={() =>
+                runHand_active && runHand(runHand_active.id, runTask)
+              }
+              disabled={!runHand_active || !!running}
+              className="px-4 py-2 text-xs font-medium text-white bg-[var(--accent-cyan)] rounded-lg hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Run
+            </button>
+          </div>
+          {/* Output */}
+          <div
+            ref={outputRef}
+            className="bg-[var(--bg-primary)] border border-[var(--glass-border)] rounded-lg p-4 max-h-80 overflow-y-auto font-mono text-xs text-[var(--text-muted)] whitespace-pre-wrap leading-relaxed"
+          >
+            {runOutput ||
+              (running ? "Starting hand..." : "Output will appear here...")}
+          </div>
         </div>
       )}
 

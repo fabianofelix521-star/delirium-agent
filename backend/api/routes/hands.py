@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import os
 import shutil
 import time
+import uuid
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -530,25 +534,98 @@ async def enable_hand(hand_id: str, req: HandConfigRequest):
     return {"status": "enabled" if req.enabled else "disabled", "hand_id": hand_id}
 
 
+class HandRunRequest(BaseModel):
+    task: str = ""
+
+
+def _build_hand_system_prompt(hand: dict) -> str:
+    """Build a system prompt tailored to a specific hand."""
+    tools_list = ", ".join(hand["tools"])
+    return f"""You are the **{hand['name']}** ({hand['icon']}) — an autonomous AI hand in the Delirium Infinite system.
+
+## Your Mission
+{hand['description']}
+
+## Available Tools
+You have access to these tools: {tools_list}
+
+When you need to use a tool, respond with ONLY a JSON object:
+```json
+{{"tool": "tool_name", "args": {{"param": "value"}}}}
+```
+
+## Rules
+1. Be proactive and autonomous — complete the task without asking for clarification
+2. Use your tools to gather real data and take real actions
+3. Report your progress and findings clearly
+4. Match the user's language (Portuguese if they speak Portuguese)
+5. If a tool isn't available, use alternatives (web_search, shell, python)
+"""
+
+
 @router.post("/{hand_id}/run")
-async def run_hand(hand_id: str):
-    """Trigger a manual run of an autonomous hand."""
+async def run_hand(hand_id: str, req: HandRunRequest | None = None):
+    """Trigger a run of an autonomous hand with optional task."""
+    import json
+    from agent.core import agent
+
+    found = None
     for h in HANDS:
         if h["id"] == hand_id:
-            if hand_id not in _hand_states:
-                _hand_states[hand_id] = {"enabled": True, "runs": 0, "last_run": None, "logs": []}
-            _hand_states[hand_id]["runs"] += 1
-            _hand_states[hand_id]["last_run"] = time.time()
+            found = h
+            break
+    if not found:
+        raise HTTPException(status_code=404, detail="Hand not found")
+
+    if hand_id not in _hand_states:
+        _hand_states[hand_id] = {"enabled": True, "runs": 0, "last_run": None, "logs": []}
+    _hand_states[hand_id]["enabled"] = True
+    _hand_states[hand_id]["runs"] += 1
+    _hand_states[hand_id]["last_run"] = time.time()
+    run_number = _hand_states[hand_id]["runs"]
+
+    task = (req.task if req and req.task else "").strip()
+    if not task:
+        task = f"Run your autonomous capabilities. {found['description']}"
+
+    conversation_id = f"hand-{hand_id}-{uuid.uuid4().hex[:8]}"
+    system_prompt = _build_hand_system_prompt(found)
+
+    async def event_stream():
+        yield f"data: {json.dumps({'type': 'start', 'hand_id': hand_id, 'run': run_number})}\n\n"
+        try:
+            full_response = ""
+            async for token in agent.stream_chat(
+                message=task,
+                conversation_id=conversation_id,
+                system_prompt=system_prompt,
+            ):
+                full_response += token
+                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
             _hand_states[hand_id].setdefault("logs", []).append({
-                "run": _hand_states[hand_id]["runs"],
-                "started_at": time.time(),
-                "status": "running",
-                "tools_used": h["tools"][:2],
+                "run": run_number,
+                "started_at": _hand_states[hand_id]["last_run"],
+                "completed_at": time.time(),
+                "status": "completed",
+                "task": task,
+                "response_length": len(full_response),
             })
-            return {
-                "status": "running",
-                "hand_id": hand_id,
-                "run_number": _hand_states[hand_id]["runs"],
-                "message": f"Hand '{h['name']}' started run #{_hand_states[hand_id]['runs']}",
-            }
-    raise HTTPException(status_code=404, detail="Hand not found")
+            yield f"data: {json.dumps({'type': 'done', 'hand_id': hand_id})}\n\n"
+        except Exception as e:
+            _hand_states[hand_id].setdefault("logs", []).append({
+                "run": run_number,
+                "started_at": _hand_states[hand_id]["last_run"],
+                "completed_at": time.time(),
+                "status": "error",
+                "error": str(e),
+            })
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.get("/{hand_id}/logs")
+async def get_hand_logs(hand_id: str):
+    """Get run logs for a hand."""
+    state = _hand_states.get(hand_id, {})
+    return {"hand_id": hand_id, "logs": state.get("logs", []), "total_runs": state.get("runs", 0)}

@@ -32,7 +32,8 @@ class CustomProvider(BaseProvider):
                       "temperature": temperature, "max_tokens": max_tokens}
         # Qwen3 thinking support: use thinking budget to reduce latency
         if "qwen3" in (model or "").lower():
-            payload["extra_body"] = {"enable_thinking": True, "thinking_budget": 1024}
+            payload["enable_thinking"] = True
+            payload["thinking_budget"] = 1024
         async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(
                 f"{self.base_url}/chat/completions",
@@ -53,7 +54,8 @@ class CustomProvider(BaseProvider):
         payload: dict = {"model": model, "messages": [{"role": m.role, "content": m.content} for m in messages],
                       "temperature": temperature, "max_tokens": max_tokens, "stream": True}
         if "qwen3" in (model or "").lower():
-            payload["extra_body"] = {"enable_thinking": True, "thinking_budget": 1024}
+            payload["enable_thinking"] = True
+            payload["thinking_budget"] = 1024
         async with httpx.AsyncClient(timeout=180) as client:
             async with client.stream(
                 "POST", f"{self.base_url}/chat/completions", headers=self._headers(),

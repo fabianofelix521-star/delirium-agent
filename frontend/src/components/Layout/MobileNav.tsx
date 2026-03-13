@@ -86,7 +86,7 @@ export function MobileNav() {
           <div
             className="absolute bottom-0 left-0 right-0 animate-slide-up"
             style={{
-              paddingBottom: "calc(60px + env(safe-area-inset-bottom, 0px))",
+              paddingBottom: "calc(68px + env(safe-area-inset-bottom, 0px))",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -174,14 +174,14 @@ export function MobileNav() {
 
       {/* Bottom Tab Bar */}
       <nav
-        className="md:hidden flex items-center justify-around shrink-0"
+        className="md:hidden flex items-center justify-around shrink-0 mx-3 mb-2 rounded-2xl"
         style={{
-          height: "calc(56px + env(safe-area-inset-bottom, 0px))",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          height: "56px",
           background: "var(--glass-bg-solid)",
-          borderTop: "1px solid var(--glass-border)",
+          border: "1px solid var(--glass-border)",
           backdropFilter: "blur(32px)",
           WebkitBackdropFilter: "blur(32px)",
+          boxShadow: "0 -4px 30px rgba(0,0,0,0.2)",
         }}
       >
         {primaryNavItems.map((item) => {

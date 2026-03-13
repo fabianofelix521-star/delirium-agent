@@ -77,7 +77,6 @@ function ChatPageInner() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const sendVoiceMessageRef = useRef<(text: string) => void>(undefined);
   const [activeModes, setActiveModes] = useState<Set<string>>(new Set());
-  const suggestionTextRef = useRef<string>("");
 
   // Load existing conversation from URL param
   const loadConversation = useCallback((id: string) => {
@@ -709,55 +708,6 @@ function ChatPageInner() {
     }
   };
 
-  const suggestions = [
-    {
-      icon: Code,
-      text: "Write a Python script to scrape a website",
-      desc: "Code execution",
-      color: "#6366f1",
-    },
-    {
-      icon: Globe,
-      text: "Search the web for the latest AI news",
-      desc: "Web browsing",
-      color: "#06b6d4",
-    },
-    {
-      icon: BarChart3,
-      text: "Analyze and visualize data from a CSV file",
-      desc: "Data analysis",
-      color: "#8b5cf6",
-    },
-    {
-      icon: Bug,
-      text: "Debug and fix this error in my code",
-      desc: "Debugging",
-      color: "#ec4899",
-    },
-    {
-      icon: Terminal,
-      text: "Run shell commands to set up a project",
-      desc: "Shell access",
-      color: "#10b981",
-    },
-    {
-      icon: FileText,
-      text: "Create a full project structure with files",
-      desc: "File operations",
-      color: "#f59e0b",
-    },
-  ];
-
-  const handleSuggestionClick = (text: string) => {
-    setInput(text);
-    // Use ref to pass text directly since state won't be updated yet
-    suggestionTextRef.current = text;
-    requestAnimationFrame(() => {
-      handleSendDirect(suggestionTextRef.current);
-      suggestionTextRef.current = "";
-    });
-  };
-
   return (
     <div className="flex h-full relative">
       {/* Main Chat Area */}
@@ -796,75 +746,9 @@ function ChatPageInner() {
               <h2 className="text-2xl font-bold gradient-text mb-1 tracking-tight">
                 What can I help with?
               </h2>
-              <p
-                className="text-[13px] mb-10"
-                style={{ color: "var(--text-muted)" }}
-              >
+              <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
                 I can code, browse the web, manage files, and much more.
               </p>
-
-              {/* Suggestions grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 w-full max-w-2xl">
-                {suggestions.map((s, i) => {
-                  const Icon = s.icon;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => handleSuggestionClick(s.text)}
-                      className="liquid-glass liquid-glass-hover p-3.5 text-left transition-all group"
-                    >
-                      <div className="flex items-center gap-2.5 relative z-10">
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110"
-                          style={{ background: `${s.color}12`, color: s.color }}
-                        >
-                          <Icon size={15} strokeWidth={1.8} />
-                        </div>
-                        <div className="min-w-0">
-                          <p
-                            className="text-[12px] font-medium truncate"
-                            style={{ color: "var(--text-secondary)" }}
-                          >
-                            {s.text}
-                          </p>
-                          <p
-                            className="text-[10px]"
-                            style={{ color: "var(--text-ghost)" }}
-                          >
-                            {s.desc}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Capabilities bar */}
-              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-6 sm:mt-8">
-                {[
-                  { icon: "☁️", label: activeModel },
-                  { icon: "⚡", label: "6 Tools" },
-                  { icon: "🔗", label: "10 Integrations" },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                    style={{
-                      background: "var(--bg-tertiary)",
-                      border: "1px solid var(--glass-border)",
-                    }}
-                  >
-                    <span className="text-xs">{item.icon}</span>
-                    <span
-                      className="text-[10px] font-medium"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
             </div>
           ) : (
             <div className="space-y-1 max-w-3xl mx-auto">

@@ -108,6 +108,7 @@ class AgentOrchestrator:
         provider: str | None = None,
         model: str | None = None,
         agent_id: str | None = None,
+        system_prompt: str | None = None,
     ) -> LLMResponse:
         """Process a user message and return the agent's response (non-streaming with tool loop)."""
         convo = self.get_or_create_conversation(conversation_id)
@@ -116,10 +117,17 @@ class AgentOrchestrator:
         if agent_id:
             convo.agent_id = agent_id
 
-        if not convo.messages:
+        # Always apply system_prompt override when provided (e.g. code page)
+        if system_prompt:
+            if convo.messages and convo.messages[0].role == "system":
+                convo.messages[0] = Message(role="system", content=system_prompt)
+            else:
+                convo.messages.insert(0, Message(role="system", content=system_prompt))
+        elif not convo.messages:
+            prompt = _build_system_prompt(convo.agent_id or agent_id)
             convo.messages.append(Message(
                 role="system",
-                content=_build_system_prompt(convo.agent_id or agent_id),
+                content=prompt,
             ))
 
         convo.messages.append(Message(role="user", content=message))
@@ -156,6 +164,7 @@ class AgentOrchestrator:
         provider: str | None = None,
         model: str | None = None,
         agent_id: str | None = None,
+        system_prompt: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream a chat response with automatic tool execution loop."""
         convo = self.get_or_create_conversation(conversation_id)
@@ -164,10 +173,17 @@ class AgentOrchestrator:
         if agent_id:
             convo.agent_id = agent_id
 
-        if not convo.messages:
+        # Always apply system_prompt override when provided (e.g. code page)
+        if system_prompt:
+            if convo.messages and convo.messages[0].role == "system":
+                convo.messages[0] = Message(role="system", content=system_prompt)
+            else:
+                convo.messages.insert(0, Message(role="system", content=system_prompt))
+        elif not convo.messages:
+            prompt = _build_system_prompt(convo.agent_id or agent_id)
             convo.messages.append(Message(
                 role="system",
-                content=_build_system_prompt(convo.agent_id or agent_id),
+                content=prompt,
             ))
 
         convo.messages.append(Message(role="user", content=message))

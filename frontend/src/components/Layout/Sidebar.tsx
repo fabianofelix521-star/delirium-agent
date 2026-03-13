@@ -21,17 +21,28 @@ import {
   Trash2,
   Zap,
   Code2,
+  Radio,
+  Hand,
+  GitBranch,
+  Calendar,
+  Mic,
 } from "lucide-react";
 
 const navItems = [
   { href: "/chat", label: "Chat", icon: MessageCircle },
   { href: "/code", label: "Code", icon: Code2 },
+  { href: "/voice", label: "Voice", icon: Mic },
+  { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/skills", label: "ClawHub", icon: Sparkles },
+  { href: "/hands", label: "Hands", icon: Hand },
+  { href: "/channels", label: "Channels", icon: Radio },
+  { href: "/workflows", label: "Workflows", icon: GitBranch },
+  { href: "/scheduler", label: "Scheduler", icon: Calendar },
   { href: "/tools", label: "Tools", icon: Wrench },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/plugins", label: "Plugins", icon: Puzzle },
   { href: "/integrations", label: "Integrations", icon: Link2 },
-  { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/plugins", label: "Plugins", icon: Puzzle },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

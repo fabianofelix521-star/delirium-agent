@@ -30,6 +30,11 @@ from api.routes.voice import router as voice_router
 from api.routes.github import router as github_router
 from api.routes.mcp import router as mcp_router
 from api.routes.agents import router as agents_router
+from api.routes.skills import router as skills_router
+from api.routes.channels import router as channels_router
+from api.routes.hands import router as hands_router
+from api.routes.workflows import router as workflows_router
+from api.routes.scheduler import router as scheduler_router
 
 
 @asynccontextmanager
@@ -70,6 +75,11 @@ app.include_router(voice_router, prefix="/api/voice", tags=["voice"])
 app.include_router(github_router, prefix="/api/github", tags=["github"])
 app.include_router(mcp_router, prefix="/api/mcp", tags=["mcp"])
 app.include_router(agents_router, prefix="/api/agents", tags=["agents"])
+app.include_router(skills_router, prefix="/api/skills", tags=["skills"])
+app.include_router(channels_router, prefix="/api/channels", tags=["channels"])
+app.include_router(hands_router, prefix="/api/hands", tags=["hands"])
+app.include_router(workflows_router, prefix="/api/workflows", tags=["workflows"])
+app.include_router(scheduler_router, prefix="/api/scheduler", tags=["scheduler"])
 
 
 # ─── Health Check ────────────────────────────────────────

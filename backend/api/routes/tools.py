@@ -51,7 +51,7 @@ async def list_tools(category: str | None = None) -> list[dict]:
             "description": info["description"],
             "category": meta["category"],
             "icon": meta["icon"],
-            "enabled": True,
+            "enabled": name not in _disabled_tools,
             "parameters": info["parameters"],
         }
         if category and tool_data["category"] != category:
@@ -83,6 +83,22 @@ async def get_tool(tool_id: str) -> dict:
         "description": info["description"],
         "category": meta["category"],
         "icon": meta["icon"],
-        "enabled": True,
+        "enabled": tool_id not in _disabled_tools,
         "parameters": info["parameters"],
     }
+
+
+# In-memory set of disabled tools
+_disabled_tools: set[str] = set()
+
+
+@router.put("/{tool_id}/toggle")
+async def toggle_tool(tool_id: str, body: ToolToggle) -> dict:
+    """Enable or disable a tool."""
+    if tool_id not in TOOLS:
+        return {"error": "Tool not found"}
+    if body.enabled:
+        _disabled_tools.discard(tool_id)
+    else:
+        _disabled_tools.add(tool_id)
+    return {"id": tool_id, "enabled": body.enabled}

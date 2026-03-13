@@ -139,6 +139,7 @@ export function Navbar() {
       "/plugins": "Plugins",
       "/integrations": "Integrations",
       "/agents": "Agents",
+      "/skills": "ClawHub",
       "/settings": "Settings",
     };
     for (const [path, title] of Object.entries(titles)) {

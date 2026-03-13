@@ -141,14 +141,36 @@ const PRESETS = [
   { label: "Mobile", icon: Smartphone, width: "375px", height: "812px" },
 ];
 
-const CODE_SYSTEM_PROMPT = `You are Delirium Code — an expert full-stack developer AI.
-When the user asks to create UI, apps, games, or components, respond with COMPLETE working code.
-ALWAYS output the full HTML in a single \`\`\`html block — this includes all CSS and JavaScript inline.
-For React/Vue/Svelte, use CDN imports (unpkg/esm.sh) so it runs directly in the browser.
-Make sure the code is COMPLETE and RUNNABLE — never use placeholders or "..." .
-NEVER output JSON tool calls. Always output real code in markdown code blocks.
-When creating multi-file projects, start with the main HTML file, then show other files in separate code blocks with filenames as comments.
-Be concise but thorough. Prefer modern best practices. Make it beautiful.`;
+const CODE_SYSTEM_PROMPT = `You are Delirium Code — an expert full-stack developer AI specialized in generating RUNNABLE code.
+
+## CRITICAL RULES — ALWAYS FOLLOW:
+1. When asked to create ANY UI, app, game, component, or website: output a COMPLETE, RUNNABLE HTML file.
+2. The HTML file MUST contain ALL CSS (in <style>) and ALL JavaScript (in <script>) INLINE — ONE single file.
+3. ALWAYS wrap the code in a markdown code block with the language tag: \`\`\`html
+4. For React/Vue/Svelte, use CDN imports (unpkg.com, esm.sh) so the code runs directly in a browser.
+5. NEVER output partial code, placeholders like "...", or "// rest of code here".
+6. NEVER output JSON tool calls like {"tool": "..."}. You are a code generator, NOT a tool executor.
+7. NEVER just describe what to do — generate the ACTUAL complete code.
+8. For multi-file projects, put each file in a separate code block with a filename comment on the first line.
+
+## Output Format Example:
+\`\`\`html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App</title>
+  <style>/* all CSS here */</style>
+</head>
+<body>
+  <!-- all HTML here -->
+  <script>/* all JS here */</script>
+</body>
+</html>
+\`\`\`
+
+Be concise in explanations but generate COMPLETE, beautiful, production-quality code. Match the user's language.`;
 
 const LANG_MAP: Record<string, string> = {
   ts: "typescript",
@@ -182,13 +204,15 @@ function stripThinkTags(content: string): string {
 function extractAllCodeBlocks(rawContent: string): ProjectFile[] {
   const content = stripThinkTags(rawContent);
   const files: ProjectFile[] = [];
-  const regex = /```(\w*)\n([\s\S]*?)```/g;
+  // Match ``` and ~~~ fenced code blocks (some models use ~~~)
+  const regex = /(?:```|~~~)(\w*)\s*\n([\s\S]*?)(?:```|~~~)/g;
   let match;
   let index = 0;
 
   while ((match = regex.exec(content)) !== null) {
     const lang = match[1] || "text";
     const code = match[2].trim();
+    if (!code) continue;
     const filenameMatch = code.match(
       /^(?:\/\/|#|<!--)\s*(?:file:\s*)?(\S+\.\w+)/i,
     );
@@ -203,7 +227,42 @@ function extractAllCodeBlocks(rawContent: string): ProjectFile[] {
     index++;
   }
 
+  // Fallback: detect bare HTML (no code blocks) — some models output raw HTML
+  if (files.length === 0) {
+    const bareHtml = extractBareHtml(content);
+    if (bareHtml) {
+      files.push({ path: "index.html", content: bareHtml, language: "html" });
+    }
+  }
+
   return files;
+}
+
+/** Extract bare HTML from content that has no code fences */
+function extractBareHtml(content: string): string | null {
+  const lower = content.toLowerCase();
+  // Look for <!DOCTYPE or <html as start markers
+  const dtIdx = lower.indexOf("<!doctype");
+  const htmlIdx = lower.indexOf("<html");
+  const startIdx = dtIdx >= 0 ? dtIdx : htmlIdx;
+  if (startIdx < 0) return null;
+  // Look for closing </html>
+  const endTag = "</html>";
+  const endIdx = lower.lastIndexOf(endTag);
+  if (endIdx > startIdx) {
+    return content.slice(startIdx, endIdx + endTag.length).trim();
+  }
+  // No closing tag? Take everything from the start marker
+  const rest = content.slice(startIdx).trim();
+  if (
+    rest.length > 100 &&
+    (rest.includes("<body") ||
+      rest.includes("<div") ||
+      rest.includes("<script"))
+  ) {
+    return rest;
+  }
+  return null;
 }
 
 function extractProjectFromToolCall(rawContent: string): ProjectFile[] | null {
@@ -255,7 +314,8 @@ function extractPreviewHtml(rawContent: string): string | null {
     if (jsxFile) return wrapJsxInHtml(jsxFile.content);
   }
 
-  const htmlMatch = content.match(/```html\n([\s\S]*?)```/);
+  // Match ``` and ~~~ html blocks
+  const htmlMatch = content.match(/(?:```|~~~)html\s*\n([\s\S]*?)(?:```|~~~)/);
   if (htmlMatch) {
     const raw = htmlMatch[1].trim();
     if (
@@ -266,11 +326,13 @@ function extractPreviewHtml(rawContent: string): string | null {
     return wrapFragmentInHtml(raw);
   }
 
-  const jsxMatch = content.match(/```(?:jsx|tsx)\n([\s\S]*?)```/);
+  const jsxMatch = content.match(
+    /(?:```|~~~)(?:jsx|tsx)\s*\n([\s\S]*?)(?:```|~~~)/,
+  );
   if (jsxMatch) return wrapJsxInHtml(jsxMatch[1].trim());
 
-  // Fallback: try any code block that looks like HTML/markup
-  const anyBlock = content.match(/```\w*\n([\s\S]*?)```/);
+  // Fallback: any fenced code block with HTML content
+  const anyBlock = content.match(/(?:```|~~~)\w*\s*\n([\s\S]*?)(?:```|~~~)/);
   if (anyBlock) {
     const code = anyBlock[1].trim();
     if (code.includes("<") && code.includes(">")) {
@@ -279,8 +341,40 @@ function extractPreviewHtml(rawContent: string): string | null {
         code.toLowerCase().includes("<html")
       )
         return code;
-      return wrapFragmentInHtml(code);
+      if (
+        code.includes("<div") ||
+        code.includes("<body") ||
+        code.includes("<section") ||
+        code.includes("<main") ||
+        code.includes("<h1") ||
+        code.includes("<canvas") ||
+        code.includes("<style") ||
+        code.includes("<script")
+      )
+        return wrapFragmentInHtml(code);
     }
+  }
+
+  // Aggressive fallback: detect bare HTML outside code blocks (models that skip fences)
+  const bareHtml = extractBareHtml(content);
+  if (bareHtml) return bareHtml;
+
+  // Last resort: find substantial inline HTML tags without any fences
+  const inlineHtmlMatch = content.match(
+    /(<(?:div|section|main|body|table|form|canvas|svg)[\s\S]{200,})/i,
+  );
+  if (inlineHtmlMatch) {
+    const fragment = inlineHtmlMatch[1].trim();
+    // Find a reasonable end point
+    const lastClose = Math.max(
+      fragment.lastIndexOf("</div>"),
+      fragment.lastIndexOf("</section>"),
+      fragment.lastIndexOf("</main>"),
+      fragment.lastIndexOf("</body>"),
+      fragment.lastIndexOf("</script>"),
+    );
+    const cleaned = lastClose > 0 ? fragment.slice(0, lastClose + 7) : fragment;
+    return wrapFragmentInHtml(cleaned);
   }
 
   return null;
@@ -418,6 +512,9 @@ export default function CodeArenaPage() {
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+
+  // Mobile view mode: 'chat' or 'preview'
+  const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -632,7 +729,8 @@ export default function CodeArenaPage() {
       if (proj) restoreProject(proj);
     };
     window.addEventListener("delirium-restore-code-project", handler);
-    return () => window.removeEventListener("delirium-restore-code-project", handler);
+    return () =>
+      window.removeEventListener("delirium-restore-code-project", handler);
   }, [restoreProject]);
 
   const handleSend = async () => {
@@ -644,7 +742,8 @@ export default function CodeArenaPage() {
       content: input.trim(),
       timestamp: Date.now(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+    const currentMessages = [...messages, userMsg];
+    setMessages(currentMessages);
     setInput("");
     setIsStreaming(true);
 
@@ -666,18 +765,16 @@ export default function CodeArenaPage() {
         contextParts.push(
           `[Viewing file: ${previewCode.name}]\n\`\`\`${previewCode.language}\n${previewCode.content.slice(0, 2000)}\n\`\`\``,
         );
-      const fullMessage = contextParts.length
+      // Add code-output instruction to user message so ALL models follow it
+      // (some models like Kimi K2.5 and MiniMax ignore system prompts)
+      const codeReminder =
+        "[IMPORTANT: Output COMPLETE runnable code in a ```html code block. Do NOT just describe — generate the actual code.]";
+      const baseMessage = contextParts.length
         ? `${contextParts.join("\n")}\n\nUser: ${userMsg.content}`
         : userMsg.content;
+      const fullMessage = `${codeReminder}\n\n${baseMessage}`;
 
       const token = localStorage.getItem("delirium_token");
-      const codeAgent =
-        localStorage.getItem("delirium_active_agent") || undefined;
-      const codeInstruction =
-        "IMPORTANT: Output ALL code as a COMPLETE, RUNNABLE HTML file inside a single ```html code block with ALL CSS and JS inline. Never use placeholders.";
-      const systemPrefix = codeAgent
-        ? `${codeInstruction}\n\n`
-        : `${CODE_SYSTEM_PROMPT}\n\n`;
       const res = await fetch(`${API_BASE}/api/chat/send`, {
         method: "POST",
         headers: {
@@ -685,16 +782,18 @@ export default function CodeArenaPage() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          message: `${systemPrefix}${fullMessage}`,
+          message: fullMessage,
           conversation_id: conversationId || undefined,
           stream: true,
           provider: activeProvider,
           model: activeModel,
-          agent_id: codeAgent,
+          system_prompt: CODE_SYSTEM_PROMPT,
         }),
       });
 
-      let finalContent = "";
+      let rawContent = "";
+      let displayContent = "";
+      let inThink = false;
 
       if (res.ok && res.body) {
         const reader = res.body.getReader();
@@ -714,11 +813,25 @@ export default function CodeArenaPage() {
                 if (data.type === "start" && data.conversation_id)
                   setConversationId(data.conversation_id);
                 if (data.type === "token") {
-                  finalContent += data.content;
+                  const tk = data.content;
+                  rawContent += tk;
+                  // Strip think tags for display
+                  if (tk.includes("<think>")) {
+                    inThink = true;
+                    const before = tk.split("<think>")[0];
+                    if (before) displayContent += before;
+                  } else if (inThink && tk.includes("</think>")) {
+                    inThink = false;
+                    const after = tk.split("</think>")[1] || "";
+                    if (after) displayContent += after;
+                  } else if (!inThink) {
+                    displayContent += tk;
+                  }
                   setMessages((prev) => {
                     const updated = [...prev];
                     const last = updated[updated.length - 1];
-                    if (last.role === "assistant") last.content = finalContent;
+                    if (last.role === "assistant")
+                      last.content = displayContent;
                     return updated;
                   });
                 }
@@ -729,11 +842,8 @@ export default function CodeArenaPage() {
           }
         }
         processAiResponse(
-          finalContent,
-          [
-            ...messages.slice(0, -1),
-            { ...assistantMsg, content: finalContent },
-          ],
+          rawContent,
+          [...currentMessages, { ...assistantMsg, content: displayContent }],
           conversationId,
         );
       } else {
@@ -948,6 +1058,89 @@ export default function CodeArenaPage() {
   /* ─── RENDER ─── */
   return (
     <div className="flex flex-col h-full animate-fade-in">
+      {/* Mobile Tab Switcher */}
+      {(hasPreview || hasProject) && (
+        <div
+          className="flex md:hidden shrink-0"
+          style={{
+            borderBottom: "1px solid var(--glass-border)",
+            background: "var(--bg-surface)",
+          }}
+        >
+          <button
+            onClick={() => setMobileView("chat")}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold transition-all"
+            style={{
+              color:
+                mobileView === "chat"
+                  ? "var(--accent-indigo)"
+                  : "var(--text-muted)",
+              borderBottom:
+                mobileView === "chat"
+                  ? "2px solid var(--accent-indigo)"
+                  : "2px solid transparent",
+            }}
+          >
+            <Send size={13} /> Chat
+          </button>
+          <button
+            onClick={() => {
+              setMobileView("preview");
+              setRightTab("preview");
+            }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold transition-all"
+            style={{
+              color:
+                mobileView === "preview" && rightTab === "preview"
+                  ? "var(--accent-indigo)"
+                  : "var(--text-muted)",
+              borderBottom:
+                mobileView === "preview" && rightTab === "preview"
+                  ? "2px solid var(--accent-indigo)"
+                  : "2px solid transparent",
+            }}
+          >
+            <Eye size={13} /> Preview
+            {hasPreview && (
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: "#10b981" }}
+              />
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setMobileView("preview");
+              setRightTab("code");
+            }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold transition-all"
+            style={{
+              color:
+                mobileView === "preview" && rightTab === "code"
+                  ? "var(--accent-indigo)"
+                  : "var(--text-muted)",
+              borderBottom:
+                mobileView === "preview" && rightTab === "code"
+                  ? "2px solid var(--accent-indigo)"
+                  : "2px solid transparent",
+            }}
+          >
+            <Code2 size={13} /> Code
+            {hasProject && (
+              <span
+                className="text-[9px] ml-0.5 px-1 py-0.5 rounded"
+                style={{
+                  background: "rgba(99,102,241,0.1)",
+                  color: "var(--accent-indigo)",
+                }}
+              >
+                {projectFiles.length}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-1 min-h-0 relative">
         {/* ─── Side Panel (GitHub) ─── */}
         {sidePanel && (
@@ -1291,7 +1484,7 @@ export default function CodeArenaPage() {
 
         {/* ─── LEFT: Chat ─── */}
         <div
-          className={`flex flex-col min-w-0 ${splitView ? "md:w-[45%]" : "flex-1"}`}
+          className={`flex flex-col min-w-0 ${mobileView === "preview" ? "hidden md:flex" : "flex"} ${splitView ? "md:w-[45%]" : "flex-1"}`}
           style={{
             borderRight: splitView
               ? "1px solid var(--glass-border)"
@@ -1668,10 +1861,12 @@ export default function CodeArenaPage() {
         </div>
 
         {/* ─── RIGHT: Preview / Code / Files (LM Arena style) ─── */}
-        {splitView && (
-          <div className="hidden md:flex flex-col flex-1 min-w-0">
+        {(splitView || mobileView === "preview") && (
+          <div
+            className={`${mobileView === "preview" ? "flex md:flex" : "hidden md:flex"} flex-col flex-1 min-w-0`}
+          >
             <div
-              className="flex items-center gap-1 px-3 py-2 shrink-0"
+              className="hidden md:flex items-center gap-1 px-3 py-2 shrink-0"
               style={{
                 borderBottom: "1px solid var(--glass-border)",
                 background: "var(--bg-surface)",
@@ -1857,8 +2052,11 @@ export default function CodeArenaPage() {
               )}
 
               <button
-                onClick={() => setSplitView(false)}
-                className="p-1.5 rounded-lg hover:opacity-80"
+                onClick={() => {
+                  setSplitView(false);
+                  setMobileView("chat");
+                }}
+                className="hidden md:flex p-1.5 rounded-lg hover:opacity-80"
                 style={{
                   background: "var(--bg-elevated)",
                   border: "1px solid var(--glass-border)",
@@ -2125,9 +2323,12 @@ export default function CodeArenaPage() {
           </div>
         )}
 
-        {!splitView && (hasPreview || hasProject) && (
+        {!splitView && (hasPreview || hasProject) && mobileView === "chat" && (
           <button
-            onClick={() => setSplitView(true)}
+            onClick={() => {
+              setSplitView(true);
+              setMobileView("preview");
+            }}
             className="fixed bottom-20 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl text-[12px] font-semibold shadow-lg hover:scale-105 md:bottom-6"
             style={{
               background: "var(--accent-gradient)",

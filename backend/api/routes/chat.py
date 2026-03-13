@@ -21,6 +21,7 @@ class ChatRequest(BaseModel):
     model: Optional[str] = None
     stream: bool = True
     agent_id: Optional[str] = None
+    system_prompt: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -46,6 +47,7 @@ async def send_message(request: ChatRequest):
                     provider=request.provider,
                     model=request.model,
                     agent_id=request.agent_id,
+                    system_prompt=request.system_prompt,
                 ):
                     yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"
@@ -60,6 +62,7 @@ async def send_message(request: ChatRequest):
             provider=request.provider,
             model=request.model,
             agent_id=request.agent_id,
+            system_prompt=request.system_prompt,
         )
         return ChatResponse(
             content=response.content,

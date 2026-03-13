@@ -8,8 +8,6 @@ import {
   RotateCcw,
   ExternalLink,
   Globe,
-  Maximize2,
-  ChevronDown,
 } from "lucide-react";
 
 const PRESETS = [
@@ -25,7 +23,6 @@ export default function PreviewPage() {
   const [inputUrl, setInputUrl] = useState("http://localhost:3001");
   const [device, setDevice] = useState(0);
   const [key, setKey] = useState(0);
-  const [showPresets, setShowPresets] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -59,34 +56,38 @@ export default function PreviewPage() {
     <div className="flex flex-col h-full animate-fade-in">
       {/* Toolbar */}
       <div
-        className="flex items-center gap-3 px-4 py-3 shrink-0"
+        className="flex flex-wrap items-center gap-2 px-3 py-2 sm:px-4 sm:py-3 shrink-0"
         style={{
           borderBottom: "1px solid var(--glass-border)",
           background: "var(--bg-surface)",
         }}
       >
         {/* URL Bar */}
-        <form onSubmit={navigate} className="flex-1 flex gap-2">
+        <form onSubmit={navigate} className="flex-1 flex gap-2 min-w-0">
           <div
-            className="flex items-center gap-2 flex-1 px-3 py-1.5 rounded-lg"
+            className="flex items-center gap-2 flex-1 px-3 py-1.5 rounded-lg min-w-0"
             style={{
               background: "var(--bg-elevated)",
               border: "1px solid var(--glass-border)",
             }}
           >
-            <Globe size={14} style={{ color: "var(--text-muted)" }} />
+            <Globe
+              size={14}
+              className="shrink-0"
+              style={{ color: "var(--text-muted)" }}
+            />
             <input
               type="text"
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
               placeholder="http://localhost:3001"
-              className="flex-1 bg-transparent text-[13px] outline-none"
+              className="flex-1 bg-transparent text-[13px] outline-none min-w-0"
               style={{ color: "var(--text-primary)" }}
             />
           </div>
           <button
             type="submit"
-            className="px-3 py-1.5 rounded-lg text-[12px] font-medium"
+            className="px-3 py-1.5 rounded-lg text-[12px] font-medium shrink-0"
             style={{
               background: "var(--accent-gradient)",
               color: "white",
@@ -96,106 +97,75 @@ export default function PreviewPage() {
           </button>
         </form>
 
-        {/* Device Switcher */}
-        <div className="relative">
+        {/* Controls Row */}
+        <div className="flex items-center gap-1.5">
+          {/* Device Switcher - icons only on mobile */}
+          <div
+            className="flex rounded-lg overflow-hidden"
+            style={{
+              border: "1px solid var(--glass-border)",
+              background: "var(--bg-elevated)",
+            }}
+          >
+            {PRESETS.map((p, i) => {
+              const Icon = p.icon;
+              return (
+                <button
+                  key={p.label}
+                  onClick={() => setDevice(i)}
+                  className="flex items-center gap-1 px-2 py-1.5 text-[11px] transition-all"
+                  style={{
+                    color:
+                      i === device
+                        ? "var(--accent-indigo)"
+                        : "var(--text-muted)",
+                    background:
+                      i === device ? "rgba(99,102,241,0.1)" : "transparent",
+                    borderRight:
+                      i < PRESETS.length - 1
+                        ? "1px solid var(--glass-border)"
+                        : "none",
+                  }}
+                >
+                  <Icon size={14} />
+                  <span className="hidden sm:inline">{p.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
           <button
-            onClick={() => setShowPresets(!showPresets)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px]"
+            onClick={refresh}
+            className="p-1.5 rounded-lg hover:opacity-80"
             style={{
               background: "var(--bg-elevated)",
               border: "1px solid var(--glass-border)",
-              color: "var(--text-secondary)",
+              color: "var(--text-muted)",
             }}
+            title="Refresh"
           >
-            <DeviceIcon size={14} />
-            {preset.label}
-            <ChevronDown size={12} />
+            <RotateCcw size={14} />
           </button>
-
-          {showPresets && (
-            <div
-              className="absolute top-full right-0 mt-1 rounded-lg overflow-hidden z-50"
-              style={{
-                background: "var(--bg-surface)",
-                border: "1px solid var(--glass-border)",
-                boxShadow: "var(--glass-shadow)",
-              }}
-            >
-              {PRESETS.map((p, i) => {
-                const Icon = p.icon;
-                return (
-                  <button
-                    key={p.label}
-                    onClick={() => {
-                      setDevice(i);
-                      setShowPresets(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-[12px] hover:opacity-80"
-                    style={{
-                      color:
-                        i === device
-                          ? "var(--accent-indigo)"
-                          : "var(--text-secondary)",
-                      background:
-                        i === device ? "rgba(99,102,241,0.08)" : "transparent",
-                    }}
-                  >
-                    <Icon size={14} />
-                    {p.label}
-                    <span style={{ color: "var(--text-muted)" }}>
-                      {p.width} × {p.height}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 rounded-lg hover:opacity-80"
+            style={{
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--glass-border)",
+              color: "var(--text-muted)",
+            }}
+            title="Open in new tab"
+          >
+            <ExternalLink size={14} />
+          </a>
         </div>
-
-        {/* Actions */}
-        <button
-          onClick={refresh}
-          className="p-1.5 rounded-lg hover:opacity-80"
-          style={{
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--glass-border)",
-            color: "var(--text-muted)",
-          }}
-          title="Refresh"
-        >
-          <RotateCcw size={14} />
-        </button>
-        <button
-          onClick={() => setDevice(0)}
-          className="p-1.5 rounded-lg hover:opacity-80"
-          style={{
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--glass-border)",
-            color: "var(--text-muted)",
-          }}
-          title="Fullscreen"
-        >
-          <Maximize2 size={14} />
-        </button>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="p-1.5 rounded-lg hover:opacity-80"
-          style={{
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--glass-border)",
-            color: "var(--text-muted)",
-          }}
-          title="Open in new tab"
-        >
-          <ExternalLink size={14} />
-        </a>
       </div>
 
       {/* Preview Area */}
       <div
-        className="flex-1 flex items-center justify-center overflow-auto p-4"
+        className="flex-1 flex items-center justify-center overflow-auto p-2 sm:p-4"
         style={{ background: "var(--bg-void)" }}
       >
         <div
@@ -205,8 +175,8 @@ export default function PreviewPage() {
             height: preset.height,
             maxWidth: "100%",
             maxHeight: "100%",
-            border: device > 0 ? "8px solid var(--glass-border)" : undefined,
-            borderRadius: device > 0 ? "24px" : "8px",
+            border: device > 0 ? "4px solid var(--glass-border)" : undefined,
+            borderRadius: device > 0 ? "16px" : "8px",
             boxShadow: device > 0 ? "0 20px 60px rgba(0,0,0,0.3)" : undefined,
           }}
         >
@@ -227,17 +197,17 @@ export default function PreviewPage() {
 
       {/* Status bar */}
       <div
-        className="flex items-center justify-between px-4 py-1.5 text-[11px] shrink-0"
+        className="flex items-center justify-between px-3 sm:px-4 py-1.5 text-[10px] sm:text-[11px] shrink-0"
         style={{
           borderTop: "1px solid var(--glass-border)",
           background: "var(--bg-surface)",
           color: "var(--text-muted)",
         }}
       >
-        <span>
-          Preview: {url} · {preset.label} ({preset.width} × {preset.height})
+        <span className="truncate">
+          {url} · {preset.label}
         </span>
-        <span>Auto-refresh: iframe reload</span>
+        <span className="hidden sm:inline">Auto-refresh: iframe reload</span>
       </div>
     </div>
   );

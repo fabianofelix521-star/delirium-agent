@@ -1,7 +1,10 @@
 # ═══════════════════════════════════════════════════════════
 # Backend Dockerfile - Delirium Infinite
+# Works with both repo-root context (Railway) and backend/ context (docker-compose)
 # ═══════════════════════════════════════════════════════════
 FROM python:3.11-slim AS base
+
+ARG APP_DIR=.
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -15,11 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY ${APP_DIR}/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY . .
+COPY ${APP_DIR}/ .
 
 # Create non-root user
 RUN groupadd -r delirium && useradd -r -g delirium -d /home/delirium -m delirium && \

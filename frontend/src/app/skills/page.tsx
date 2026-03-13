@@ -69,9 +69,10 @@ export default function SkillsPage() {
       ),
     ])
       .then(([skillsData, agentsData]) => {
-        setSkills(skillsData);
-        setAgents(agentsData);
-        if (agentsData.length > 0) {
+        setSkills(Array.isArray(skillsData) ? skillsData : []);
+        const agentsList = Array.isArray(agentsData) ? agentsData : [];
+        setAgents(agentsList);
+        if (agentsList.length > 0) {
           const saved = localStorage.getItem("delirium_active_agent");
           setSelectedAgent(saved || agentsData[0].id);
         }

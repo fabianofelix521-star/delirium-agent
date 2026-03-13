@@ -225,6 +225,7 @@ class ChannelConfigRequest(BaseModel):
     config: dict
 
 
+@router.get("")
 @router.get("/")
 async def list_channels():
     """List all 40 available channels."""

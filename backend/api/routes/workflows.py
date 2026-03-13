@@ -99,6 +99,7 @@ class WorkflowUpdate(BaseModel):
     edges: list[dict] | None = None
 
 
+@router.get("")
 @router.get("/")
 async def list_workflows():
     """List all workflows."""
@@ -118,6 +119,7 @@ async def get_workflow(workflow_id: str):
     raise HTTPException(status_code=404, detail="Workflow not found")
 
 
+@router.post("")
 @router.post("/")
 async def create_workflow(req: WorkflowCreate):
     wf = {

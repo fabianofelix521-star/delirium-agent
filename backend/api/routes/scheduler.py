@@ -104,6 +104,7 @@ class TaskUpdate(BaseModel):
     config: dict | None = None
 
 
+@router.get("")
 @router.get("/")
 async def list_tasks():
     """List all scheduled tasks."""
@@ -123,6 +124,7 @@ async def get_task(task_id: str):
     raise HTTPException(status_code=404, detail="Task not found")
 
 
+@router.post("")
 @router.post("/")
 async def create_task(req: TaskCreate):
     task = {

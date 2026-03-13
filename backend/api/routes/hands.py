@@ -472,6 +472,7 @@ class HandConfigRequest(BaseModel):
     enabled: bool = True
 
 
+@router.get("")
 @router.get("/")
 async def list_hands():
     """List all autonomous hands with live requirement checks."""

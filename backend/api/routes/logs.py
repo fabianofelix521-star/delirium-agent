@@ -61,6 +61,7 @@ add_log("INFO", "All API routes registered", "router")
 add_log("INFO", "Security systems initialized", "security")
 
 
+@router.get("")
 @router.get("/")
 async def get_logs(
     level: str | None = None,
@@ -86,6 +87,7 @@ async def get_audit_trail(limit: int = Query(100, le=1000)) -> list:
     return _audit_trail[-limit:][::-1]
 
 
+@router.post("")
 @router.post("/")
 async def post_log(body: dict) -> dict:
     """Add a log entry."""
@@ -98,6 +100,7 @@ async def post_log(body: dict) -> dict:
     return {"ok": True}
 
 
+@router.delete("")
 @router.delete("/")
 async def clear_logs() -> dict:
     """Clear all logs."""

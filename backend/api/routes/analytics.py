@@ -41,6 +41,7 @@ def record_usage(provider: str, model: str, tokens_in: int, tokens_out: int, cos
     _daily_stats[day_key]["cost"] += cost
 
 
+@router.get("")
 @router.get("/")
 async def get_analytics() -> dict:
     """Aggregated analytics overview."""

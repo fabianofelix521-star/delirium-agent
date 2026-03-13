@@ -80,6 +80,7 @@ SECURITY_SYSTEMS = [
 ]
 
 
+@router.get("")
 @router.get("/")
 async def get_overview() -> dict:
     """Full overview dashboard data."""

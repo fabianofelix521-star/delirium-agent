@@ -30,3 +30,4 @@ Thumbs.db
 # Test files
 test_*.py
 *.mp4
+backend/_check_routes.py

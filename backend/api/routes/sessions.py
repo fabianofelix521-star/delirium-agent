@@ -48,6 +48,7 @@ def add_message(session_id: str, role: str, content: str) -> bool:
     return True
 
 
+@router.get("")
 @router.get("/")
 async def list_sessions(agent: str | None = None, limit: int = Query(50, le=500)) -> list:
     """List all sessions, optionally filtered by agent."""

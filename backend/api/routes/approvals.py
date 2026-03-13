@@ -39,6 +39,7 @@ def request_approval(
     return approval
 
 
+@router.get("")
 @router.get("/")
 async def list_approvals(status: str | None = None) -> list:
     """List all approvals, optionally filtered by status."""

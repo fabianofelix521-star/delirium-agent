@@ -35,6 +35,13 @@ from api.routes.channels import router as channels_router
 from api.routes.hands import router as hands_router
 from api.routes.workflows import router as workflows_router
 from api.routes.scheduler import router as scheduler_router
+from api.routes.overview import router as overview_router
+from api.routes.analytics import router as analytics_router
+from api.routes.logs import router as logs_router
+from api.routes.sessions import router as sessions_router
+from api.routes.approvals import router as approvals_router
+from api.routes.comms import router as comms_router
+from api.routes.runtime import router as runtime_router
 
 
 @asynccontextmanager
@@ -80,6 +87,13 @@ app.include_router(channels_router, prefix="/api/channels", tags=["channels"])
 app.include_router(hands_router, prefix="/api/hands", tags=["hands"])
 app.include_router(workflows_router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(scheduler_router, prefix="/api/scheduler", tags=["scheduler"])
+app.include_router(overview_router, prefix="/api/overview", tags=["overview"])
+app.include_router(analytics_router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(logs_router, prefix="/api/logs", tags=["logs"])
+app.include_router(sessions_router, prefix="/api/sessions", tags=["sessions"])
+app.include_router(approvals_router, prefix="/api/approvals", tags=["approvals"])
+app.include_router(comms_router, prefix="/api/comms", tags=["comms"])
+app.include_router(runtime_router, prefix="/api/runtime", tags=["runtime"])
 
 
 # ─── Health Check ────────────────────────────────────────

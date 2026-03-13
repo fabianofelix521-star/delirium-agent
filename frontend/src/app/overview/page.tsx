@@ -105,7 +105,13 @@ export default function OverviewPage() {
   if (loading || !data) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full" style={{ borderColor: "var(--accent-indigo)", borderTopColor: "transparent" }} />
+        <div
+          className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full"
+          style={{
+            borderColor: "var(--accent-indigo)",
+            borderTopColor: "transparent",
+          }}
+        />
       </div>
     );
   }
@@ -114,7 +120,10 @@ export default function OverviewPage() {
     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+        <h2
+          className="text-xl font-bold"
+          style={{ color: "var(--text-primary)" }}
+        >
           Overview
         </h2>
         <div className="flex items-center gap-3">
@@ -141,10 +150,30 @@ export default function OverviewPage() {
       {/* Top Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { icon: Bot, label: "Agents Running", value: String(data.metrics.agents_running), color: "#6366f1" },
-          { icon: Zap, label: "Tokens Used", value: formatTokens(data.metrics.tokens_used), color: "#f59e0b" },
-          { icon: DollarSign, label: "Total Cost", value: `$${data.metrics.total_cost.toFixed(2)}`, color: "#22c55e" },
-          { icon: Clock, label: "Uptime", value: data.uptime, color: "#3b82f6" },
+          {
+            icon: Bot,
+            label: "Agents Running",
+            value: String(data.metrics.agents_running),
+            color: "#6366f1",
+          },
+          {
+            icon: Zap,
+            label: "Tokens Used",
+            value: formatTokens(data.metrics.tokens_used),
+            color: "#f59e0b",
+          },
+          {
+            icon: DollarSign,
+            label: "Total Cost",
+            value: `$${data.metrics.total_cost.toFixed(2)}`,
+            color: "#22c55e",
+          },
+          {
+            icon: Clock,
+            label: "Uptime",
+            value: data.uptime,
+            color: "#3b82f6",
+          },
         ].map((m) => (
           <div
             key={m.label}
@@ -157,11 +186,17 @@ export default function OverviewPage() {
           >
             <div className="flex items-center gap-2 mb-2">
               <m.icon size={16} style={{ color: m.color }} />
-              <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+              <span
+                className="text-[11px] font-medium"
+                style={{ color: "var(--text-muted)" }}
+              >
                 {m.label}
               </span>
             </div>
-            <p className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+            <p
+              className="text-2xl font-bold"
+              style={{ color: "var(--text-primary)" }}
+            >
               {m.value}
             </p>
           </div>
@@ -172,16 +207,28 @@ export default function OverviewPage() {
         {/* LLM Providers */}
         <div
           className="rounded-xl overflow-hidden"
-          style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+          style={{
+            background: "var(--glass-bg)",
+            border: "1px solid var(--glass-border)",
+          }}
         >
-          <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--glass-border)" }}>
+          <div
+            className="px-4 py-3 flex items-center justify-between"
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
+          >
             <div className="flex items-center gap-2">
               <Server size={14} style={{ color: "var(--accent-indigo)" }} />
-              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
                 LLM Providers
               </span>
             </div>
-            <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            <span
+              className="text-[11px]"
+              style={{ color: "var(--text-muted)" }}
+            >
               {data.providers.configured}/{data.providers.total} configured
             </span>
           </div>
@@ -191,14 +238,21 @@ export default function OverviewPage() {
                 key={p.id}
                 className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-all cursor-pointer"
               >
-                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   {p.name}
                 </span>
                 <span
                   className="text-[10px] px-2 py-0.5 rounded-full font-medium"
                   style={{
-                    background: p.status === "ready" ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.05)",
-                    color: p.status === "ready" ? "#22c55e" : "var(--text-ghost)",
+                    background:
+                      p.status === "ready"
+                        ? "rgba(34,197,94,0.15)"
+                        : "rgba(255,255,255,0.05)",
+                    color:
+                      p.status === "ready" ? "#22c55e" : "var(--text-ghost)",
                   }}
                 >
                   {p.status === "ready" ? "ready" : "not configured"}
@@ -213,31 +267,63 @@ export default function OverviewPage() {
           {/* System Health */}
           <div
             className="rounded-xl p-4"
-            style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+            style={{
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
+            }}
           >
             <div className="flex items-center gap-2 mb-3">
               <Cpu size={14} style={{ color: "var(--accent-indigo)" }} />
-              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
                 System Health
               </span>
             </div>
             <div className="space-y-3">
               {[
-                { label: "CPU", value: data.system_health.cpu_percent, color: "#6366f1" },
-                { label: "Memory", value: data.system_health.memory_percent, color: "#f59e0b" },
-                { label: "Disk", value: data.system_health.disk_percent, color: "#22c55e" },
+                {
+                  label: "CPU",
+                  value: data.system_health.cpu_percent,
+                  color: "#6366f1",
+                },
+                {
+                  label: "Memory",
+                  value: data.system_health.memory_percent,
+                  color: "#f59e0b",
+                },
+                {
+                  label: "Disk",
+                  value: data.system_health.disk_percent,
+                  color: "#22c55e",
+                },
               ].map((s) => (
                 <div key={s.label}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{s.label}</span>
-                    <span className="text-[11px] font-bold" style={{ color: "var(--text-primary)" }}>
+                    <span
+                      className="text-[11px]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {s.label}
+                    </span>
+                    <span
+                      className="text-[11px] font-bold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
                       {s.value.toFixed(1)}%
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+                  <div
+                    className="h-1.5 rounded-full overflow-hidden"
+                    style={{ background: "rgba(255,255,255,0.05)" }}
+                  >
                     <div
                       className="h-full rounded-full transition-all"
-                      style={{ width: `${Math.min(s.value, 100)}%`, background: s.color }}
+                      style={{
+                        width: `${Math.min(s.value, 100)}%`,
+                        background: s.color,
+                      }}
                     />
                   </div>
                 </div>
@@ -248,11 +334,17 @@ export default function OverviewPage() {
           {/* Security Systems */}
           <div
             className="rounded-xl p-4"
-            style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+            style={{
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
+            }}
           >
             <div className="flex items-center gap-2 mb-3">
               <Shield size={14} style={{ color: "#22c55e" }} />
-              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Security Systems
               </span>
             </div>
@@ -261,13 +353,20 @@ export default function OverviewPage() {
                 <span
                   key={s}
                   className="px-2 py-1 rounded-md text-[10px] font-medium"
-                  style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.2)" }}
+                  style={{
+                    background: "rgba(34,197,94,0.1)",
+                    color: "#22c55e",
+                    border: "1px solid rgba(34,197,94,0.2)",
+                  }}
                 >
                   {s}
                 </span>
               ))}
             </div>
-            <p className="text-[10px] mt-2" style={{ color: "var(--text-ghost)" }}>
+            <p
+              className="text-[10px] mt-2"
+              style={{ color: "var(--text-ghost)" }}
+            >
               {data.security_count} defense-in-depth systems active
             </p>
           </div>
@@ -278,9 +377,15 @@ export default function OverviewPage() {
           {/* Quick Actions */}
           <div
             className="rounded-xl p-4"
-            style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+            style={{
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
+            }}
           >
-            <p className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+            <p
+              className="text-sm font-semibold mb-3"
+              style={{ color: "var(--text-primary)" }}
+            >
               Quick Actions
             </p>
             <div className="space-y-2">
@@ -297,9 +402,15 @@ export default function OverviewPage() {
                       className="w-8 h-8 rounded-lg flex items-center justify-center"
                       style={{ background: "rgba(99,102,241,0.1)" }}
                     >
-                      <Icon size={14} style={{ color: "var(--accent-indigo)" }} />
+                      <Icon
+                        size={14}
+                        style={{ color: "var(--accent-indigo)" }}
+                      />
                     </div>
-                    <span className="text-xs font-medium flex-1" style={{ color: "var(--text-secondary)" }}>
+                    <span
+                      className="text-xs font-medium flex-1"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       {qa.label}
                     </span>
                     <ChevronRight
@@ -316,37 +427,64 @@ export default function OverviewPage() {
           {/* Recent Activity */}
           <div
             className="rounded-xl overflow-hidden"
-            style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+            style={{
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
+            }}
           >
-            <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--glass-border)" }}>
+            <div
+              className="px-4 py-3 flex items-center gap-2"
+              style={{ borderBottom: "1px solid var(--glass-border)" }}
+            >
               <Activity size={14} style={{ color: "var(--accent-indigo)" }} />
-              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Recent Activity
               </span>
             </div>
             <div className="max-h-[200px] overflow-y-auto p-2">
               {data.recent_activity.length === 0 ? (
-                <p className="text-center text-xs py-6" style={{ color: "var(--text-ghost)" }}>
+                <p
+                  className="text-center text-xs py-6"
+                  style={{ color: "var(--text-ghost)" }}
+                >
                   No recent activity
                 </p>
               ) : (
                 data.recent_activity.map((ev) => (
-                  <div key={ev.id} className="flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.03]">
+                  <div
+                    key={ev.id}
+                    className="flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.03]"
+                  >
                     <div
                       className="w-6 h-6 rounded-md flex items-center justify-center mt-0.5 shrink-0"
                       style={{ background: "rgba(99,102,241,0.1)" }}
                     >
-                      <Activity size={10} style={{ color: "var(--accent-indigo)" }} />
+                      <Activity
+                        size={10}
+                        style={{ color: "var(--accent-indigo)" }}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-medium truncate" style={{ color: "var(--text-secondary)" }}>
+                      <p
+                        className="text-[11px] font-medium truncate"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
                         {ev.type}
                       </p>
-                      <p className="text-[10px] truncate" style={{ color: "var(--text-ghost)" }}>
+                      <p
+                        className="text-[10px] truncate"
+                        style={{ color: "var(--text-ghost)" }}
+                      >
                         {ev.details || ev.agent_id}
                       </p>
                     </div>
-                    <span className="text-[10px] shrink-0" style={{ color: "var(--text-ghost)" }}>
+                    <span
+                      className="text-[10px] shrink-0"
+                      style={{ color: "var(--text-ghost)" }}
+                    >
                       {timeAgo(ev.timestamp)}
                     </span>
                   </div>

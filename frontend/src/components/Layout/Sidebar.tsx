@@ -33,6 +33,7 @@ import {
   ShieldCheck,
   MessagesSquare,
   Server,
+  Github,
 } from "lucide-react";
 
 const navItems = [
@@ -56,6 +57,7 @@ const navItems = [
   { href: "/runtime", label: "Runtime", icon: Server },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/integrations", label: "Integrations", icon: Link2 },
+  { href: "/copilot", label: "Copilot", icon: Github },
   { href: "/plugins", label: "Plugins", icon: Puzzle },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

@@ -12,6 +12,7 @@ from providers.anthropic_provider import AnthropicProvider
 from providers.google_provider import GoogleProvider
 from providers.groq_provider import GroqProvider
 from providers.custom_provider import CustomProvider
+from providers.copilot_provider import CopilotProvider
 
 
 class LLMRouter:
@@ -85,6 +86,13 @@ class LLMRouter:
                 "qwen/qwen3-coder", "cohere/command-r-plus",
             ]
 
+        # GitHub Copilot (via GitHub Models API)
+        if key := os.getenv("GITHUB_TOKEN"):
+            self.providers["copilot"] = CopilotProvider(
+                api_key=key,
+                default_model=os.getenv("COPILOT_DEFAULT_MODEL", "gpt-4o"),
+            )
+
         # Custom OpenAI-compatible
         if url := os.getenv("CUSTOM_API_BASE_URL"):
             self.providers["custom"] = CustomProvider(
@@ -134,7 +142,7 @@ class LLMRouter:
 
         # Set default and fallback
         self.default_provider = os.getenv("DEFAULT_PROVIDER", "alibaba")
-        self.fallback_order = [p for p in ["alibaba", "openrouter", "together", "mistral", "cohere",
+        self.fallback_order = [p for p in ["alibaba", "openrouter", "copilot", "together", "mistral", "cohere",
                                            "groq", "openai", "anthropic", "google", "custom"] if p in self.providers]
 
     def get_provider(self, name: str | None = None) -> BaseProvider:

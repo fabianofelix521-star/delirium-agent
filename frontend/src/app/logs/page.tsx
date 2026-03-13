@@ -101,15 +101,19 @@ export default function LogsPage() {
   }, [tab, fetchLogs, fetchAudit]);
 
   const clearLogs = () => {
-    fetch(`${API_BASE}/api/logs`, { method: "DELETE", headers: getAuthHeaders() })
-      .then(() => setLogs([]));
+    fetch(`${API_BASE}/api/logs`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    }).then(() => setLogs([]));
   };
 
   const exportLogs = () => {
     fetch(`${API_BASE}/api/logs/export`, { headers: getAuthHeaders() })
       .then((r) => r.json())
       .then((data) => {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: "application/json",
+        });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -123,7 +127,10 @@ export default function LogsPage() {
     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+        <h2
+          className="text-xl font-bold"
+          style={{ color: "var(--text-primary)" }}
+        >
           Logs
         </h2>
         <div className="flex items-center gap-2 flex-wrap">
@@ -143,7 +150,11 @@ export default function LogsPage() {
             <option>ERROR</option>
           </select>
           <div className="relative">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-ghost)" }} />
+            <Search
+              size={12}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2"
+              style={{ color: "var(--text-ghost)" }}
+            />
             <input
               type="text"
               placeholder="Search..."
@@ -157,21 +168,41 @@ export default function LogsPage() {
               }}
             />
           </div>
-          <button onClick={() => setPaused(!paused)} className="px-3 py-1.5 rounded-lg text-xs font-medium"
-            style={{ background: paused ? "rgba(239,68,68,0.15)" : "rgba(34,197,94,0.15)", color: paused ? "#ef4444" : "#22c55e", border: `1px solid ${paused ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}` }}>
+          <button
+            onClick={() => setPaused(!paused)}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{
+              background: paused
+                ? "rgba(239,68,68,0.15)"
+                : "rgba(34,197,94,0.15)",
+              color: paused ? "#ef4444" : "#22c55e",
+              border: `1px solid ${paused ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}`,
+            }}
+          >
             {paused ? "Resume" : "Pause"}
           </button>
-          <button onClick={clearLogs} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: "var(--text-ghost)" }}>
+          <button
+            onClick={clearLogs}
+            className="p-1.5 rounded-lg hover:bg-white/5"
+            style={{ color: "var(--text-ghost)" }}
+          >
             <Trash2 size={14} />
           </button>
-          <button onClick={exportLogs} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: "var(--text-ghost)" }}>
+          <button
+            onClick={exportLogs}
+            className="p-1.5 rounded-lg hover:bg-white/5"
+            style={{ color: "var(--text-ghost)" }}
+          >
             <Download size={14} />
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-lg w-fit" style={{ background: "var(--bg-elevated)" }}>
+      <div
+        className="flex gap-1 p-1 rounded-lg w-fit"
+        style={{ background: "var(--bg-elevated)" }}
+      >
         {(["live", "audit"] as const).map((t) => (
           <button
             key={t}
@@ -191,26 +222,48 @@ export default function LogsPage() {
       {tab === "live" ? (
         <div
           className="rounded-xl overflow-hidden"
-          style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+          style={{
+            background: "var(--glass-bg)",
+            border: "1px solid var(--glass-border)",
+          }}
         >
           <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
             {loading ? (
-              <p className="text-center text-xs py-10" style={{ color: "var(--text-ghost)" }}>
+              <p
+                className="text-center text-xs py-10"
+                style={{ color: "var(--text-ghost)" }}
+              >
                 Connecting to log stream...
               </p>
             ) : logs.length === 0 ? (
-              <p className="text-center text-xs py-10" style={{ color: "var(--text-ghost)" }}>
+              <p
+                className="text-center text-xs py-10"
+                style={{ color: "var(--text-ghost)" }}
+              >
                 No logs matching your filters
               </p>
             ) : (
-              <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
+              <div
+                className="divide-y"
+                style={{ borderColor: "var(--glass-border)" }}
+              >
                 {logs.map((log) => {
                   const Icon = levelIcons[log.level] || Info;
                   const color = levelColors[log.level] || "#3b82f6";
                   return (
-                    <div key={log.id} className="flex items-start gap-3 px-4 py-2.5 hover:bg-white/[0.02]">
-                      <Icon size={13} style={{ color }} className="mt-0.5 shrink-0" />
-                      <span className="text-[10px] font-mono shrink-0 w-16" style={{ color: "var(--text-ghost)" }}>
+                    <div
+                      key={log.id}
+                      className="flex items-start gap-3 px-4 py-2.5 hover:bg-white/[0.02]"
+                    >
+                      <Icon
+                        size={13}
+                        style={{ color }}
+                        className="mt-0.5 shrink-0"
+                      />
+                      <span
+                        className="text-[10px] font-mono shrink-0 w-16"
+                        style={{ color: "var(--text-ghost)" }}
+                      >
                         {formatTime(log.timestamp)}
                       </span>
                       <span
@@ -219,10 +272,16 @@ export default function LogsPage() {
                       >
                         {log.level}
                       </span>
-                      <span className="text-[10px] shrink-0 w-16 truncate" style={{ color: "var(--text-ghost)" }}>
+                      <span
+                        className="text-[10px] shrink-0 w-16 truncate"
+                        style={{ color: "var(--text-ghost)" }}
+                      >
                         [{log.source}]
                       </span>
-                      <span className="text-xs flex-1" style={{ color: "var(--text-secondary)" }}>
+                      <span
+                        className="text-xs flex-1"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
                         {log.message}
                       </span>
                     </div>
@@ -235,26 +294,49 @@ export default function LogsPage() {
       ) : (
         <div
           className="rounded-xl overflow-hidden"
-          style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+          style={{
+            background: "var(--glass-bg)",
+            border: "1px solid var(--glass-border)",
+          }}
         >
           <div className="p-4 space-y-2">
             {audit.length === 0 ? (
-              <p className="text-center text-xs py-10" style={{ color: "var(--text-ghost)" }}>
+              <p
+                className="text-center text-xs py-10"
+                style={{ color: "var(--text-ghost)" }}
+              >
                 No audit trail events
               </p>
             ) : (
               audit.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.03]">
-                  <FileText size={12} style={{ color: "var(--accent-indigo)" }} />
+                <div
+                  key={a.id}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.03]"
+                >
+                  <FileText
+                    size={12}
+                    style={{ color: "var(--accent-indigo)" }}
+                  />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                    <p
+                      className="text-xs font-medium"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       {a.action} — {a.entity}
                     </p>
                     {a.details && (
-                      <p className="text-[10px]" style={{ color: "var(--text-ghost)" }}>{a.details}</p>
+                      <p
+                        className="text-[10px]"
+                        style={{ color: "var(--text-ghost)" }}
+                      >
+                        {a.details}
+                      </p>
                     )}
                   </div>
-                  <span className="text-[10px] shrink-0" style={{ color: "var(--text-ghost)" }}>
+                  <span
+                    className="text-[10px] shrink-0"
+                    style={{ color: "var(--text-ghost)" }}
+                  >
                     {timeAgo(a.timestamp)}
                   </span>
                 </div>

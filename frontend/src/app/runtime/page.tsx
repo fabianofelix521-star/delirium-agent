@@ -73,7 +73,13 @@ export default function RuntimePage() {
   if (loading || !data) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full" style={{ borderColor: "var(--accent-indigo)", borderTopColor: "transparent" }} />
+        <div
+          className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full"
+          style={{
+            borderColor: "var(--accent-indigo)",
+            borderTopColor: "transparent",
+          }}
+        />
       </div>
     );
   }
@@ -85,7 +91,10 @@ export default function RuntimePage() {
       color: "#6366f1",
       items: [
         { label: "Platform", value: data.system.platform },
-        { label: "OS", value: `${data.system.os} ${data.system.os_version.slice(0, 30)}` },
+        {
+          label: "OS",
+          value: `${data.system.os} ${data.system.os_version.slice(0, 30)}`,
+        },
         { label: "Architecture", value: data.system.architecture },
         { label: "Hostname", value: data.system.hostname },
         { label: "Python", value: data.system.python_version.split(" ")[0] },
@@ -109,7 +118,14 @@ export default function RuntimePage() {
         { label: "Physical Cores", value: String(data.cpu.cores_physical) },
         { label: "Logical Cores", value: String(data.cpu.cores_logical) },
         { label: "Usage", value: `${data.cpu.usage_percent}%` },
-        ...(data.cpu.frequency_mhz ? [{ label: "Frequency", value: `${data.cpu.frequency_mhz.toFixed(0)} MHz` }] : []),
+        ...(data.cpu.frequency_mhz
+          ? [
+              {
+                label: "Frequency",
+                value: `${data.cpu.frequency_mhz.toFixed(0)} MHz`,
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -140,10 +156,17 @@ export default function RuntimePage() {
     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+        <h2
+          className="text-xl font-bold"
+          style={{ color: "var(--text-primary)" }}
+        >
           Runtime
         </h2>
-        <button onClick={fetchData} className="p-2 rounded-lg hover:bg-white/5" style={{ color: "var(--text-muted)" }}>
+        <button
+          onClick={fetchData}
+          className="p-2 rounded-lg hover:bg-white/5"
+          style={{ color: "var(--text-muted)" }}
+        >
           <RefreshCw size={16} />
         </button>
       </div>
@@ -158,16 +181,35 @@ export default function RuntimePage() {
           <div
             key={r.label}
             className="rounded-xl p-4"
-            style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+            style={{
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
+            }}
           >
             <div className="flex justify-between mb-2">
-              <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>{r.label}</span>
-              <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>{r.value}%</span>
+              <span
+                className="text-xs font-medium"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {r.label}
+              </span>
+              <span
+                className="text-xs font-bold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {r.value}%
+              </span>
             </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+            <div
+              className="h-2 rounded-full overflow-hidden"
+              style={{ background: "rgba(255,255,255,0.05)" }}
+            >
               <div
                 className="h-full rounded-full transition-all"
-                style={{ width: `${Math.min(r.value, 100)}%`, background: r.color }}
+                style={{
+                  width: `${Math.min(r.value, 100)}%`,
+                  background: r.color,
+                }}
               />
             </div>
           </div>
@@ -180,17 +222,36 @@ export default function RuntimePage() {
           <div
             key={sec.title}
             className="rounded-xl overflow-hidden"
-            style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+            style={{
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
+            }}
           >
-            <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--glass-border)" }}>
+            <div
+              className="px-4 py-3 flex items-center gap-2"
+              style={{ borderBottom: "1px solid var(--glass-border)" }}
+            >
               <sec.icon size={14} style={{ color: sec.color }} />
-              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{sec.title}</span>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {sec.title}
+              </span>
             </div>
             <div className="p-3 space-y-2">
               {sec.items.map((item) => (
                 <div key={item.label} className="flex justify-between px-2">
-                  <span className="text-[11px]" style={{ color: "var(--text-ghost)" }}>{item.label}</span>
-                  <span className="text-[11px] font-medium text-right max-w-[60%] truncate" style={{ color: "var(--text-secondary)" }}>
+                  <span
+                    className="text-[11px]"
+                    style={{ color: "var(--text-ghost)" }}
+                  >
+                    {item.label}
+                  </span>
+                  <span
+                    className="text-[11px] font-medium text-right max-w-[60%] truncate"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {item.value}
                   </span>
                 </div>
@@ -202,17 +263,36 @@ export default function RuntimePage() {
         {/* Environment */}
         <div
           className="rounded-xl overflow-hidden"
-          style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+          style={{
+            background: "var(--glass-bg)",
+            border: "1px solid var(--glass-border)",
+          }}
         >
-          <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--glass-border)" }}>
+          <div
+            className="px-4 py-3 flex items-center gap-2"
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
+          >
             <Globe size={14} style={{ color: "#ec4899" }} />
-            <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Environment</span>
+            <span
+              className="text-sm font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Environment
+            </span>
           </div>
           <div className="p-3 space-y-2">
             {Object.entries(data.environment).map(([k, v]) => (
               <div key={k} className="flex justify-between px-2">
-                <span className="text-[11px] font-mono" style={{ color: "var(--text-ghost)" }}>{k}</span>
-                <span className="text-[11px] font-medium truncate max-w-[50%]" style={{ color: "var(--text-secondary)" }}>
+                <span
+                  className="text-[11px] font-mono"
+                  style={{ color: "var(--text-ghost)" }}
+                >
+                  {k}
+                </span>
+                <span
+                  className="text-[11px] font-medium truncate max-w-[50%]"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   {v}
                 </span>
               </div>
@@ -223,17 +303,38 @@ export default function RuntimePage() {
         {/* Dependencies */}
         <div
           className="rounded-xl overflow-hidden"
-          style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+          style={{
+            background: "var(--glass-bg)",
+            border: "1px solid var(--glass-border)",
+          }}
         >
-          <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--glass-border)" }}>
+          <div
+            className="px-4 py-3 flex items-center gap-2"
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
+          >
             <Package size={14} style={{ color: "#10b981" }} />
-            <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Dependencies</span>
+            <span
+              className="text-sm font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Dependencies
+            </span>
           </div>
           <div className="p-3 space-y-2">
             {Object.entries(data.dependencies).map(([k, v]) => (
               <div key={k} className="flex justify-between px-2">
-                <span className="text-[11px]" style={{ color: "var(--text-ghost)" }}>{k}</span>
-                <span className="text-[11px] font-mono" style={{ color: "var(--text-secondary)" }}>{v}</span>
+                <span
+                  className="text-[11px]"
+                  style={{ color: "var(--text-ghost)" }}
+                >
+                  {k}
+                </span>
+                <span
+                  className="text-[11px] font-mono"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {v}
+                </span>
               </div>
             ))}
           </div>

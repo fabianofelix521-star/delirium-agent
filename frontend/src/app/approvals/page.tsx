@@ -2,12 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { API_BASE, getAuthHeaders } from "@/lib/api";
-import {
-  ShieldCheck,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-} from "lucide-react";
+import { ShieldCheck, RefreshCw, CheckCircle, XCircle } from "lucide-react";
 
 interface Approval {
   id: string;
@@ -22,10 +17,25 @@ interface Approval {
   resolved_by: string | null;
 }
 
-const statusColors: Record<string, { bg: string; color: string; border: string }> = {
-  pending: { bg: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "rgba(245,158,11,0.3)" },
-  approved: { bg: "rgba(34,197,94,0.1)", color: "#22c55e", border: "rgba(34,197,94,0.3)" },
-  rejected: { bg: "rgba(239,68,68,0.1)", color: "#ef4444", border: "rgba(239,68,68,0.3)" },
+const statusColors: Record<
+  string,
+  { bg: string; color: string; border: string }
+> = {
+  pending: {
+    bg: "rgba(245,158,11,0.1)",
+    color: "#f59e0b",
+    border: "rgba(245,158,11,0.3)",
+  },
+  approved: {
+    bg: "rgba(34,197,94,0.1)",
+    color: "#22c55e",
+    border: "rgba(34,197,94,0.3)",
+  },
+  rejected: {
+    bg: "rgba(239,68,68,0.1)",
+    color: "#ef4444",
+    border: "rgba(239,68,68,0.3)",
+  },
 };
 
 const riskColors: Record<string, string> = {
@@ -76,24 +86,36 @@ export default function ApprovalsPage() {
     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+        <h2
+          className="text-xl font-bold"
+          style={{ color: "var(--text-primary)" }}
+        >
           Execution Approvals
         </h2>
-        <button onClick={fetchData} className="p-2 rounded-lg hover:bg-white/5" style={{ color: "var(--text-muted)" }}>
+        <button
+          onClick={fetchData}
+          className="p-2 rounded-lg hover:bg-white/5"
+          style={{ color: "var(--text-muted)" }}
+        >
           <RefreshCw size={16} />
         </button>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-1 p-1 rounded-lg w-fit" style={{ background: "var(--bg-elevated)" }}>
+      <div
+        className="flex gap-1 p-1 rounded-lg w-fit"
+        style={{ background: "var(--bg-elevated)" }}
+      >
         {["all", "pending", "approved", "rejected"].map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className="px-4 py-1.5 rounded-md text-xs font-medium capitalize transition-all"
             style={{
-              background: filter === f ? "rgba(99,102,241,0.15)" : "transparent",
-              color: filter === f ? "var(--accent-indigo)" : "var(--text-muted)",
+              background:
+                filter === f ? "rgba(99,102,241,0.15)" : "transparent",
+              color:
+                filter === f ? "var(--accent-indigo)" : "var(--text-muted)",
             }}
           >
             {f === "all" ? "All" : f}
@@ -104,24 +126,41 @@ export default function ApprovalsPage() {
       {/* Approvals List */}
       <div
         className="rounded-xl overflow-hidden"
-        style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+        style={{
+          background: "var(--glass-bg)",
+          border: "1px solid var(--glass-border)",
+        }}
       >
         {loading ? (
-          <p className="text-center text-xs py-10" style={{ color: "var(--text-ghost)" }}>
+          <p
+            className="text-center text-xs py-10"
+            style={{ color: "var(--text-ghost)" }}
+          >
             Loading...
           </p>
         ) : approvals.length === 0 ? (
           <div className="text-center py-14">
-            <ShieldCheck size={30} className="mx-auto mb-3" style={{ color: "var(--text-ghost)" }} />
-            <h4 className="text-sm font-semibold" style={{ color: "var(--text-muted)" }}>
+            <ShieldCheck
+              size={30}
+              className="mx-auto mb-3"
+              style={{ color: "var(--text-ghost)" }}
+            />
+            <h4
+              className="text-sm font-semibold"
+              style={{ color: "var(--text-muted)" }}
+            >
               No approvals
             </h4>
             <p className="text-xs mt-1" style={{ color: "var(--text-ghost)" }}>
-              When agents request permission for sensitive actions, they&apos;ll appear here.
+              When agents request permission for sensitive actions, they&apos;ll
+              appear here.
             </p>
           </div>
         ) : (
-          <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
+          <div
+            className="divide-y"
+            style={{ borderColor: "var(--glass-border)" }}
+          >
             {approvals.map((a) => {
               const sc = statusColors[a.status] || statusColors.pending;
               return (
@@ -129,30 +168,48 @@ export default function ApprovalsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                        <span
+                          className="text-sm font-semibold"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           {a.action}
                         </span>
                         <span
                           className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                          style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}
+                          style={{
+                            background: sc.bg,
+                            color: sc.color,
+                            border: `1px solid ${sc.border}`,
+                          }}
                         >
                           {a.status}
                         </span>
                         <span
                           className="px-1.5 py-0.5 rounded text-[9px] font-medium"
-                          style={{ color: riskColors[a.risk_level] || "#f59e0b" }}
+                          style={{
+                            color: riskColors[a.risk_level] || "#f59e0b",
+                          }}
                         >
                           {a.risk_level} risk
                         </span>
                       </div>
-                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      <p
+                        className="text-xs"
+                        style={{ color: "var(--text-muted)" }}
+                      >
                         {a.description}
                       </p>
                       <div className="flex items-center gap-3 mt-2">
-                        <span className="text-[10px]" style={{ color: "var(--text-ghost)" }}>
+                        <span
+                          className="text-[10px]"
+                          style={{ color: "var(--text-ghost)" }}
+                        >
                           Agent: {a.agent_name || a.agent_id.slice(0, 8)}
                         </span>
-                        <span className="text-[10px]" style={{ color: "var(--text-ghost)" }}>
+                        <span
+                          className="text-[10px]"
+                          style={{ color: "var(--text-ghost)" }}
+                        >
                           {timeAgo(a.requested_at)}
                         </span>
                       </div>
@@ -162,14 +219,22 @@ export default function ApprovalsPage() {
                         <button
                           onClick={() => handleAction(a.id, "approve")}
                           className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
-                          style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)" }}
+                          style={{
+                            background: "rgba(34,197,94,0.15)",
+                            color: "#22c55e",
+                            border: "1px solid rgba(34,197,94,0.3)",
+                          }}
                         >
                           <CheckCircle size={12} /> Approve
                         </button>
                         <button
                           onClick={() => handleAction(a.id, "reject")}
                           className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
-                          style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
+                          style={{
+                            background: "rgba(239,68,68,0.1)",
+                            color: "#ef4444",
+                            border: "1px solid rgba(239,68,68,0.3)",
+                          }}
                         >
                           <XCircle size={12} /> Reject
                         </button>

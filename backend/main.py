@@ -42,6 +42,7 @@ from api.routes.sessions import router as sessions_router
 from api.routes.approvals import router as approvals_router
 from api.routes.comms import router as comms_router
 from api.routes.runtime import router as runtime_router
+from api.routes.copilot import router as copilot_router
 
 
 @asynccontextmanager
@@ -94,6 +95,7 @@ app.include_router(sessions_router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(approvals_router, prefix="/api/approvals", tags=["approvals"])
 app.include_router(comms_router, prefix="/api/comms", tags=["comms"])
 app.include_router(runtime_router, prefix="/api/runtime", tags=["runtime"])
+app.include_router(copilot_router, prefix="/api/copilot", tags=["copilot"])
 
 
 # ─── Health Check ────────────────────────────────────────

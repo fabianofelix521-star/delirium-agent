@@ -178,7 +178,9 @@ export default function HandOutputPanel({
       const uploaded = await Promise.all(
         Array.from(files).map((file) => uploadAttachment(file, "hands")),
       );
-      const attachmentMarkdown = uploaded.map((item) => item.markdown).join("\n");
+      const attachmentMarkdown = uploaded
+        .map((item) => item.markdown)
+        .join("\n");
       const nextTask = task.trim()
         ? `${task.trim()}\n\n${attachmentMarkdown}`
         : attachmentMarkdown;
@@ -198,21 +200,45 @@ export default function HandOutputPanel({
       <div className="relative z-10 flex flex-col gap-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/4 px-3 py-1 text-(--text-ghost) text-[11px] uppercase tracking-[0.24em]">
-              <Sparkles className="h-3.5 w-3.5 text-(--accent-cyan)" />
+            <div
+              className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em]"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                color: "var(--text-ghost)",
+              }}
+            >
+              <Sparkles
+                className="h-3.5 w-3.5"
+                style={{ color: "var(--accent-cyan)" }}
+              />
               Hand Delivery Surface
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/10 bg-white/6 text-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <div
+                className="flex h-11 w-11 items-center justify-center border border-white/10 text-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  borderRadius: 18,
+                }}
+              >
                 {hand?.icon || (
-                  <Bot className="h-5 w-5 text-(--accent-cyan)" />
+                  <Bot
+                    className="h-5 w-5"
+                    style={{ color: "var(--accent-cyan)" }}
+                  />
                 )}
               </div>
               <div>
-                <h3 className="text-base font-semibold tracking-tight text-(--text-primary) md:text-lg">
+                <h3
+                  className="text-base font-semibold tracking-tight md:text-lg"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   {hand ? hand.name : "Hand Output"}
                 </h3>
-                <p className="text-sm text-(--text-secondary)">
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   Atividade das ferramentas separada da entrega final, pronta
                   para texto, código, imagens e mídia.
                 </p>
@@ -221,10 +247,22 @@ export default function HandOutputPanel({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-full border border-white/10 bg-white/4 px-3 py-1.5 text-(--text-secondary) text-xs">
+            <div
+              className="rounded-full border border-white/10 px-3 py-1.5 text-xs"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                color: "var(--text-secondary)",
+              }}
+            >
               {activityCount} tool{activityCount === 1 ? "" : "s"}
             </div>
-            <div className="rounded-full border border-white/10 bg-white/4 px-3 py-1.5 text-(--text-secondary) text-xs">
+            <div
+              className="rounded-full border border-white/10 px-3 py-1.5 text-xs"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                color: "var(--text-secondary)",
+              }}
+            >
               {running
                 ? "Executando"
                 : finalReport
@@ -239,7 +277,11 @@ export default function HandOutputPanel({
                 )
               }
               disabled={!output.trim()}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-(--text-secondary) text-xs transition hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-40"
+              className="glass-hover-8 inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                color: "var(--text-secondary)",
+              }}
             >
               <Download className="h-3.5 w-3.5" />
               Markdown
@@ -258,7 +300,11 @@ export default function HandOutputPanel({
             </button>
             <button
               onClick={onClose}
-              className="rounded-full border border-white/10 bg-white/4 px-3 py-1.5 text-(--text-secondary) text-xs transition hover:bg-white/8"
+              className="glass-hover-8 rounded-full border border-white/10 px-3 py-1.5 text-xs transition"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                color: "var(--text-secondary)",
+              }}
             >
               Fechar
             </button>
@@ -266,7 +312,10 @@ export default function HandOutputPanel({
         </div>
 
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="rounded-3xl border border-white/10 bg-black/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div
+            className="border border-white/10 bg-black/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+            style={{ borderRadius: 24 }}
+          >
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 ref={attachmentInputRef}
@@ -285,12 +334,20 @@ export default function HandOutputPanel({
                   }
                 }}
                 placeholder="Descreva a tarefa da hand ou deixe vazio para usar o modo padrão..."
-                className="min-w-0 flex-1 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-(--text-primary) text-sm outline-none placeholder:text-(--text-ghost) focus:border-cyan-400/40"
+                className="min-w-0 flex-1 rounded-[18px] border border-white/10 px-4 py-3 text-sm outline-none focus:border-cyan-400/40"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  color: "var(--text-primary)",
+                }}
               />
               <button
                 onClick={() => attachmentInputRef.current?.click()}
                 disabled={uploadingAttachment}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-white/10 bg-white/5 px-4 text-(--text-secondary) text-sm transition hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-45"
+                className="glass-hover-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-white/10 px-4 text-sm transition disabled:cursor-not-allowed disabled:opacity-45"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  color: "var(--text-secondary)",
+                }}
               >
                 {uploadingAttachment ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -316,13 +373,22 @@ export default function HandOutputPanel({
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,0.76fr)_minmax(320px,0.54fr)]">
-          <div className="apple-liquid-panel rounded-[28px] border border-white/10 bg-white/3 p-4 md:p-5">
+          <div
+            className="apple-liquid-panel rounded-[28px] border border-white/10 p-4 md:p-5"
+            style={{ background: "rgba(255,255,255,0.03)" }}
+          >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h4 className="text-sm font-semibold text-(--text-primary) md:text-base">
+                <h4
+                  className="text-sm font-semibold md:text-base"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   Entrega final
                 </h4>
-                <p className="text-xs text-(--text-secondary)">
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   Conteúdo otimizado para leitura, código, imagem, vídeo e
                   exportação.
                 </p>
@@ -337,25 +403,41 @@ export default function HandOutputPanel({
 
             <div
               ref={reportRef}
-              className="report-surface max-h-[70vh] overflow-y-auto rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] p-4 md:p-6"
+              className="report-surface max-h-[70vh] overflow-y-auto border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] p-4 md:p-6"
+              style={{ borderRadius: 24 }}
             >
               {finalReport.trim() ? (
                 <div className="space-y-5">
-                  <div className="rounded-3xl border border-cyan-400/10 bg-[linear-gradient(135deg,rgba(73,194,255,0.08),rgba(255,255,255,0.02))] p-4 md:p-5">
-                    <div className="mb-2 text-(--text-ghost) text-[10px] font-semibold uppercase tracking-[0.24em]">
+                  <div
+                    className="border border-cyan-400/10 bg-[linear-gradient(135deg,rgba(73,194,255,0.08),rgba(255,255,255,0.02))] p-4 md:p-5"
+                    style={{ borderRadius: 24 }}
+                  >
+                    <div
+                      className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em]"
+                      style={{ color: "var(--text-ghost)" }}
+                    >
                       Delirium Infinite Report
                     </div>
                     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                       <div>
-                        <h5 className="text-lg font-semibold text-(--text-primary)">
+                        <h5
+                          className="text-lg font-semibold"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           {hand ? `${hand.icon} ${hand.name}` : "Hand Output"}
                         </h5>
-                        <p className="mt-1 text-sm text-(--text-secondary)">
+                        <p
+                          className="mt-1 text-sm"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
                           {task ||
                             "Entrega compilada com branding, mídia avançada e timeline destacada das tools."}
                         </p>
                       </div>
-                      <div className="text-(--text-ghost) text-xs">
+                      <div
+                        className="text-xs"
+                        style={{ color: "var(--text-ghost)" }}
+                      >
                         {new Date().toLocaleString("pt-BR")}
                       </div>
                     </div>
@@ -364,13 +446,22 @@ export default function HandOutputPanel({
                 </div>
               ) : (
                 <div className="flex min-h-60 flex-col items-center justify-center rounded-[20px] border border-dashed border-white/10 bg-black/10 px-6 text-center">
-                  <Sparkles className="mb-3 h-9 w-9 text-(--accent-cyan)" />
-                  <p className="text-sm font-medium text-(--text-primary)">
+                  <Sparkles
+                    className="mb-3 h-9 w-9"
+                    style={{ color: "var(--accent-cyan)" }}
+                  />
+                  <p
+                    className="text-sm font-medium"
+                    style={{ color: "var(--text-primary)" }}
+                  >
                     {running
                       ? "A entrega está sendo montada em tempo real."
                       : "A entrega final aparecerá aqui."}
                   </p>
-                  <p className="mt-2 max-w-xl text-(--text-secondary) text-sm leading-6">
+                  <p
+                    className="mt-2 max-w-xl text-sm leading-6"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     O painel já está preparado para markdown bonito, imagens,
                     código e, futuramente, vídeos e anexos mais complexos.
                   </p>
@@ -379,19 +470,37 @@ export default function HandOutputPanel({
             </div>
           </div>
 
-          <div className="apple-liquid-panel rounded-[28px] border border-white/10 bg-white/[0.03] p-4 md:p-5">
+          <div
+            className="apple-liquid-panel rounded-[28px] border border-white/10 p-4 md:p-5"
+            style={{ background: "rgba(255,255,255,0.03)" }}
+          >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h4 className="text-sm font-semibold text-[var(--text-primary)] md:text-base">
+                <h4
+                  className="text-sm font-semibold md:text-base"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   Ferramentas em ação
                 </h4>
-                <p className="text-xs text-[var(--text-secondary)]">
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   Cada execução fica isolada em accordion para inspeção sem
                   poluir a entrega.
                 </p>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
-                <Terminal className="h-3.5 w-3.5 text-[var(--accent-cyan)]" />
+              <div
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-[11px]"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <Terminal
+                  className="h-3.5 w-3.5"
+                  style={{ color: "var(--accent-cyan)" }}
+                />
                 timeline
               </div>
             </div>
@@ -404,7 +513,10 @@ export default function HandOutputPanel({
                     open={index === activities.length - 1}
                     className="group overflow-hidden rounded-[20px] border border-white/10 bg-black/15"
                   >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--text-primary)] marker:hidden">
+                    <summary
+                      className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm marker:hidden"
+                      style={{ color: "var(--text-primary)" }}
+                    >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span
@@ -412,11 +524,17 @@ export default function HandOutputPanel({
                           />
                           <span className="font-medium">{activity.tool}</span>
                         </div>
-                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                        <p
+                          className="mt-1 truncate text-xs"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
                           {getActivityPreview(activity.content)}
                         </p>
                       </div>
-                      <ChevronDown className="h-4 w-4 shrink-0 text-[var(--text-ghost)] transition group-open:rotate-180" />
+                      <ChevronDown
+                        className="h-4 w-4 shrink-0 transition group-open:rotate-180"
+                        style={{ color: "var(--text-ghost)" }}
+                      />
                     </summary>
                     <div className="border-t border-white/10 px-4 py-4">
                       <RichContentRenderer
@@ -427,12 +545,12 @@ export default function HandOutputPanel({
                   </details>
                 ))
               ) : (
-                <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[20px] border border-dashed border-white/10 bg-black/10 px-5 text-center">
-                  <Terminal className="mb-3 h-8 w-8 text-[var(--accent-cyan)]" />
-                  <p className="text-sm font-medium text-[var(--text-primary)]">
+                <div className="flex min-h-60 flex-col items-center justify-center rounded-[20px] border border-dashed border-white/10 bg-black/10 px-5 text-center">
+                  <Terminal className="mb-3 h-8 w-8" style={{ color: "var(--accent-cyan)" }} />
+                  <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                     Nenhuma atividade de tool registrada ainda.
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                  <p className="mt-2 text-sm leading-6" style={{ color: "var(--text-secondary)" }}>
                     Quando a hand começar a executar tools, cada etapa aparecerá
                     aqui em blocos recolhíveis.
                   </p>

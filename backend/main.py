@@ -13,6 +13,10 @@ from dotenv import load_dotenv
 # Load .env from project root (one level up from backend/)
 _env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(_env_path)
+os.environ.setdefault(
+    "DELIRIUM_UPLOADS_DIR",
+    str((Path.home() / ".delirium" / "uploads").resolve()),
+)
 
 import psutil
 from fastapi import FastAPI, Request
@@ -98,7 +102,7 @@ app.include_router(comms_router, prefix="/api/comms", tags=["comms"])
 app.include_router(runtime_router, prefix="/api/runtime", tags=["runtime"])
 app.include_router(copilot_router, prefix="/api/copilot", tags=["copilot"])
 
-uploads_dir = Path(__file__).resolve().parent / "data" / "uploads"
+uploads_dir = Path(os.getenv("DELIRIUM_UPLOADS_DIR", Path.home() / ".delirium" / "uploads"))
 uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 

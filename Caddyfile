@@ -11,6 +11,11 @@
         reverse_proxy backend:8000
     }
 
+    # Uploaded attachments -> Backend static files
+    handle /uploads/* {
+        reverse_proxy backend:8000
+    }
+
     # WebSocket → Backend
     handle /ws/* {
         reverse_proxy backend:8000

@@ -326,6 +326,22 @@ body::before {
   padding-right: clamp(0.75rem, 3vw, 1rem);
 }
 
+.glass-hover-2:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.glass-hover-3:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.glass-hover-4:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.glass-hover-8:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 @media (max-width: 768px) {
   .apple-liquid-panel {
     backdrop-filter: blur(26px) saturate(150%);

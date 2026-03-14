@@ -235,7 +235,9 @@ function ChatPageInner() {
   };
 
   const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+    setAttachments((prev) =>
+      prev.filter((_, itemIndex) => itemIndex !== index),
+    );
   };
 
   // ─── Voice: TTS playback ──────────────────────
@@ -719,8 +721,10 @@ function ChatPageInner() {
               {/* Hero logo */}
               <div className="relative mb-8">
                 <div
-                  className="relative flex h-18 w-18 items-center justify-center rounded-2xl animate-float"
+                  className="relative flex items-center justify-center rounded-2xl animate-float"
                   style={{
+                    width: 72,
+                    height: 72,
                     background: "var(--accent-gradient)",
                     boxShadow: "var(--accent-glow-strong)",
                   }}
@@ -755,11 +759,13 @@ function ChatPageInner() {
                     /* User message */
                     <div className="flex justify-end mb-4">
                       <div
-                        className="max-w-[88%] rounded-3xl rounded-br-xl px-4 py-3 text-[13px] leading-relaxed md:max-w-[75%]"
+                        className="max-w-[88%] px-4 py-3 text-[13px] leading-relaxed md:max-w-[75%]"
                         style={{
                           background: "var(--accent-indigo)",
                           color: "white",
                           boxShadow: "0 4px 12px rgba(99,102,241,0.25)",
+                          borderRadius: 24,
+                          borderBottomRightRadius: 12,
                         }}
                       >
                         {msg.content}
@@ -876,7 +882,7 @@ function ChatPageInner() {
                                     [msg.id]: !p[msg.id],
                                   }))
                                 }
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/2"
+                                className="glass-hover-2 flex w-full items-center gap-2 px-3 py-2 text-left transition-colors"
                               >
                                 {msg.thinking &&
                                 !msg.content &&
@@ -958,8 +964,12 @@ function ChatPageInner() {
                             ref={(node) => {
                               assistantRefs.current[msg.id] = node;
                             }}
-                            className="apple-liquid-panel relative rounded-[26px] rounded-bl-xl px-4 py-3 text-[13px] leading-relaxed"
-                            style={{ color: "var(--text-primary)" }}
+                            className="apple-liquid-panel relative px-4 py-3 text-[13px] leading-relaxed"
+                            style={{
+                              color: "var(--text-primary)",
+                              borderRadius: 26,
+                              borderBottomLeftRadius: 12,
+                            }}
                           >
                             {msg.content ? (
                               <RichContentRenderer content={msg.content} />
@@ -977,7 +987,7 @@ function ChatPageInner() {
                             <div className="flex flex-wrap items-center gap-1 mt-1.5 ml-1">
                               <button
                                 onClick={() => handleCopy(msg.content, msg.id)}
-                                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors hover:bg-white/4"
+                                className="glass-hover-4 flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors"
                                 style={{ color: "var(--text-ghost)" }}
                               >
                                 {copied === msg.id ? (
@@ -994,21 +1004,21 @@ function ChatPageInner() {
                                 onClick={() =>
                                   downloadMessageMarkdown(msg.content, msg.id)
                                 }
-                                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors hover:bg-white/4"
+                                className="glass-hover-4 flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors"
                                 style={{ color: "var(--text-ghost)" }}
                               >
                                 <Download size={11} /> Markdown
                               </button>
                               <button
                                 onClick={() => exportMessagePdf(msg)}
-                                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors hover:bg-white/4"
+                                className="glass-hover-4 flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors"
                                 style={{ color: "var(--text-ghost)" }}
                               >
                                 <FileText size={11} /> PDF
                               </button>
                               <button
                                 onClick={() => retryAssistantResponse(msg.id)}
-                                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors hover:bg-white/4"
+                                className="glass-hover-4 flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors"
                                 style={{ color: "var(--text-ghost)" }}
                               >
                                 <RefreshCw size={11} /> Retry
@@ -1060,7 +1070,7 @@ function ChatPageInner() {
               <button
                 onClick={() => attachmentInputRef.current?.click()}
                 disabled={uploadingAttachments}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all hover:bg-white/4"
+                className="glass-hover-4 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all"
                 style={{ color: "var(--text-ghost)" }}
                 title="Attach file"
               >
@@ -1131,16 +1141,20 @@ function ChatPageInner() {
               )}
               <button
                 onClick={handleSend}
-                disabled={(!input.trim() && attachments.length === 0) || isStreaming}
+                disabled={
+                  (!input.trim() && attachments.length === 0) || isStreaming
+                }
                 className="w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0 disabled:opacity-30"
                 style={{
-                  background: input.trim() || attachments.length > 0
-                    ? "var(--accent-gradient)"
-                    : "var(--bg-elevated)",
+                  background:
+                    input.trim() || attachments.length > 0
+                      ? "var(--accent-gradient)"
+                      : "var(--bg-elevated)",
                   color: "white",
-                  boxShadow: input.trim() || attachments.length > 0
-                    ? "0 2px 12px rgba(99,102,241,0.3)"
-                    : "none",
+                  boxShadow:
+                    input.trim() || attachments.length > 0
+                      ? "0 2px 12px rgba(99,102,241,0.3)"
+                      : "none",
                 }}
               >
                 {isStreaming ? (
@@ -1158,7 +1172,9 @@ function ChatPageInner() {
                     key={`${attachment.url}-${index}`}
                     className="flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-3 py-1 text-[10px] text-(--text-secondary)"
                   >
-                    <span className="max-w-36 truncate">{attachment.filename}</span>
+                    <span className="truncate" style={{ maxWidth: 150 }}>
+                      {attachment.filename}
+                    </span>
                     <button
                       onClick={() => removeAttachment(index)}
                       className="text-(--text-ghost) transition hover:text-(--text-primary)"
@@ -1191,7 +1207,7 @@ function ChatPageInner() {
                         return next;
                       })
                     }
-                    className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-all ${isActive ? "" : "hover:bg-white/3"}`}
+                    className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-all ${isActive ? "" : "glass-hover-3"}`}
                     style={{
                       color: isActive
                         ? "var(--accent-indigo)"
@@ -1210,7 +1226,7 @@ function ChatPageInner() {
               })}
               <button
                 onClick={() => setVoiceEnabled((v) => !v)}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-all ${voiceEnabled ? "" : "hover:bg-white/3"}`}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-all ${voiceEnabled ? "" : "glass-hover-3"}`}
                 style={{
                   color: voiceEnabled
                     ? "var(--accent-violet)"

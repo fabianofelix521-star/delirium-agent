@@ -1,6 +1,7 @@
 """System API Route - System monitoring plus local attachment uploads."""
 
 import mimetypes
+import os
 import re
 import uuid
 from pathlib import Path
@@ -13,7 +14,12 @@ from api.auth import get_current_user
 
 router = APIRouter()
 
-UPLOADS_ROOT = Path(__file__).resolve().parents[2] / "data" / "uploads"
+UPLOADS_ROOT = Path(
+    os.getenv(
+        "DELIRIUM_UPLOADS_DIR",
+        str((Path.home() / ".delirium" / "uploads").resolve()),
+    )
+)
 UPLOADS_ROOT.mkdir(parents=True, exist_ok=True)
 
 

@@ -4,9 +4,10 @@ import asyncio
 import json
 import os
 import re
+from xml.etree import ElementTree as ET
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote_plus, urlparse
 
 import httpx
 
@@ -55,6 +56,25 @@ def get_tools_for_prompt() -> str:
         params = json.dumps(info["parameters"], ensure_ascii=False)
         lines.append(f"- **{name}**: {info['description']}\n  Parameters: {params}")
     return "\n".join(lines)
+
+
+async def _llm_generate(system_prompt: str, user_prompt: str, max_tokens: int = 2200) -> str:
+  """Generate specialized content through the configured LLM router."""
+  try:
+    from agent.router import router as llm_router
+    from providers.base import Message
+
+    response = await llm_router.chat(
+      [
+        Message(role="system", content=system_prompt),
+        Message(role="user", content=user_prompt),
+      ],
+      temperature=0.35,
+      max_tokens=max_tokens,
+    )
+    return response.content
+  except Exception as e:
+    return f"ERROR: specialized LLM generation failed: {e}"
 
 
 # ── Tool Implementations ─────────────────────────────────
@@ -219,6 +239,15 @@ async def tool_read_file(path: str) -> str:
 
 
 @tool(
+    "file_read",
+    "Alias for read_file used by hands",
+    {"path": "string (file path, relative to workspace or absolute)"},
+)
+async def tool_file_read(path: str) -> str:
+    return await tool_read_file(path)
+
+
+@tool(
     "write_file",
     "Write content to a file (creates dirs as needed)",
     {"path": "string (file path)", "content": "string (file content)"},
@@ -230,6 +259,24 @@ async def tool_write_file(path: str, content: str) -> str:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content)
     return f"Written {len(content)} bytes to {p}"
+
+
+@tool(
+    "file_write",
+    "Alias for write_file used by hands",
+    {"path": "string (file path)", "content": "string (file content)"},
+)
+async def tool_file_write(path: str, content: str) -> str:
+    return await tool_write_file(path, content)
+
+
+@tool(
+    "web_fetch",
+    "Alias for web_browse used by hands",
+    {"url": "string (the URL to fetch)"},
+)
+async def tool_web_fetch(url: str) -> str:
+    return await tool_web_browse(url)
 
 
 @tool(
@@ -937,6 +984,279 @@ export default function FeatureGrid() {
     </section>
   );
 }'''
+
+
+
+# ── Delirium Specialized Hand Tools ─────────────────────
+
+@tool(
+    "pesquisa_papers",
+    "Busca papers em PubMed e arXiv com resultados estruturados",
+    {"query": "string", "max_results": "integer (optional, default 5)"},
+)
+async def tool_pesquisa_papers(query: str, max_results: int = 5) -> str:
+    """Search PubMed and arXiv for relevant papers."""
+    max_results = max(1, min(max_results, 10))
+    sections: list[str] = []
+
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            pm_search = await client.get(
+                "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+                params={"db": "pubmed", "retmode": "json", "retmax": max_results, "term": query},
+            )
+            pm_search.raise_for_status()
+            ids = pm_search.json().get("esearchresult", {}).get("idlist", [])
+            if ids:
+                pm_summary = await client.get(
+                    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
+                    params={"db": "pubmed", "retmode": "json", "id": ",".join(ids)},
+                )
+                pm_summary.raise_for_status()
+                data = pm_summary.json().get("result", {})
+                lines = ["## PubMed"]
+                for pmid in ids:
+                    item = data.get(pmid, {})
+                    title = item.get("title", "Untitled")
+                    source = item.get("fulljournalname") or item.get("source") or "PubMed"
+                    pubdate = item.get("pubdate", "")
+                    lines.append(f"- {title} | {source} | {pubdate} | https://pubmed.ncbi.nlm.nih.gov/{pmid}/")
+                sections.append("\n".join(lines))
+    except Exception as e:
+        sections.append(f"## PubMed\nERROR: {e}")
+
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            arxiv = await client.get(
+                "https://export.arxiv.org/api/query",
+                params={"search_query": f"all:{query}", "start": 0, "max_results": max_results},
+            )
+            arxiv.raise_for_status()
+        root = ET.fromstring(arxiv.text)
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        entries = root.findall("atom:entry", ns)
+        if entries:
+            lines = ["## arXiv"]
+            for entry in entries:
+                title = (entry.findtext("atom:title", default="", namespaces=ns) or "").strip().replace("\n", " ")
+                summary = (entry.findtext("atom:summary", default="", namespaces=ns) or "").strip().replace("\n", " ")
+                link = entry.findtext("atom:id", default="", namespaces=ns)
+                lines.append(f"- {title} | {link}\n  Summary: {summary[:280]}")
+            sections.append("\n".join(lines))
+    except Exception as e:
+        sections.append(f"## arXiv\nERROR: {e}")
+
+    if not sections:
+        return "No paper sources returned results."
+    return "\n\n".join(sections)
+
+
+@tool(
+    "gerar_codigo_web",
+    "Gera código web em HTML/CSS/JS ou React/Next.js a partir de uma descrição",
+    {"descricao": "string", "framework": "string (react or html)"},
+)
+async def tool_gerar_codigo_web(descricao: str, framework: str = "react") -> str:
+    framework = framework.lower().strip()
+    system = (
+        "Você é um gerador de código web production-ready. Gere código limpo, pronto para uso, "
+        "com foco em UX, responsividade e estrutura clara. Se for React, use TSX com Tailwind. "
+        "Se for HTML, entregue um único arquivo completo."
+    )
+    return await _llm_generate(system, f"Framework: {framework}\nDescrição: {descricao}")
+
+
+@tool(
+    "debug_codigo",
+    "Analisa e depura código com base no erro informado",
+    {"code": "string", "erro": "string"},
+)
+async def tool_debug_codigo(code: str, erro: str) -> str:
+    system = (
+        "Você é um debugger sênior. Identifique a causa raiz, explique o problema, "
+        "proponha correção objetiva e mostre código corrigido quando necessário."
+    )
+    return await _llm_generate(system, f"Erro:\n{erro}\n\nCódigo:\n```\n{code}\n```")
+
+
+@tool(
+    "gerar_prototipo_app",
+    "Cria wireframe textual e código-base para app/site",
+    {"app_tipo": "string"},
+)
+async def tool_gerar_prototipo_app(app_tipo: str) -> str:
+    system = (
+        "Você é um product designer + frontend architect. Gere um wireframe textual, estrutura de telas, "
+        "componentes principais e um starter code em React/Next.js."
+    )
+    return await _llm_generate(system, f"Crie um protótipo para: {app_tipo}")
+
+
+def _missing_minimax_message(kind: str) -> str:
+    return f"preciso de chave API pra MiniMax ({kind}). Configure MINIMAX_API_KEY no backend para habilitar esta tool."
+
+
+@tool(
+    "gerar_imagem_site",
+    "Prepara prompt e instruções para gerar imagem de site via MiniMax",
+    {"prompt": "string"},
+)
+async def tool_gerar_imagem_site(prompt: str) -> str:
+    if not os.getenv("MINIMAX_API_KEY"):
+        return _missing_minimax_message("imagem")
+    return f"MiniMax image generation requested with prompt: {prompt}"
+
+
+@tool(
+    "imagem_molecula",
+    "Prepara prompt e instruções para gerar imagem molecular via MiniMax",
+    {"prompt": "string"},
+)
+async def tool_imagem_molecula(prompt: str) -> str:
+    if not os.getenv("MINIMAX_API_KEY"):
+        return _missing_minimax_message("imagem molecular")
+    return f"MiniMax molecule image generation requested with prompt: {prompt}"
+
+
+@tool(
+    "gerar_voz_narracao",
+    "Prepara geração de narração/voz via MiniMax TTS",
+    {"texto": "string", "voz": "string (optional)"},
+)
+async def tool_gerar_voz_narracao(texto: str, voz: str = "cientista louco") -> str:
+    if not os.getenv("MINIMAX_API_KEY"):
+        return _missing_minimax_message("voz")
+    return f"MiniMax TTS requested with voice '{voz}' and text length {len(texto)}."
+
+
+@tool(
+    "seo_copy",
+    "Gera copy SEO, anúncios e texto de landing page",
+    {"produto": "string", "tom": "string (optional)"},
+)
+async def tool_seo_copy(produto: str, tom: str = "científico") -> str:
+    system = "Você é um copywriter SEO de alta conversão. Entregue headline, subtítulo, bullets, keywords e CTA."
+    return await _llm_generate(system, f"Produto: {produto}\nTom: {tom}")
+
+
+@tool(
+    "deploy_simulacao",
+    "Simula deploy e analisa riscos de infraestrutura",
+    {"repo_desc": "string"},
+)
+async def tool_deploy_simulacao(repo_desc: str) -> str:
+    system = "Você é um DevOps engineer. Gere checklist de deploy, riscos, validações e comandos sugeridos."
+    return await _llm_generate(system, f"Simule o deploy deste projeto:\n{repo_desc}")
+
+
+@tool(
+    "ui_design_sugestao",
+    "Sugere layout e estrutura visual para uma página",
+    {"pagina": "string"},
+)
+async def tool_ui_design_sugestao(pagina: str) -> str:
+    system = "Você é um UI/UX designer premium. Sugira layout, hierarquia visual, seções, componentes e estilo visual."
+    return await _llm_generate(system, f"Página: {pagina}")
+
+
+@tool(
+    "mobile_responsivo",
+    "Gera estratégia e CSS responsivo para um elemento ou tela",
+    {"elemento": "string"},
+)
+async def tool_mobile_responsivo(elemento: str) -> str:
+    system = "Você é um especialista em responsividade. Gere estratégia mobile-first e exemplos de CSS/Tailwind."
+    return await _llm_generate(system, f"Elemento ou tela: {elemento}")
+
+
+@tool(
+    "database_setup",
+    "Cria schema SQL/NoSQL, tabelas, índices e sugestões de migrations",
+    {"dados": "string"},
+)
+async def tool_database_setup(dados: str) -> str:
+    system = "Você é um arquiteto de banco de dados. Gere schema, índices, constraints e sugestões de migração."
+    return await _llm_generate(system, f"Requisitos dos dados:\n{dados}")
+
+
+@tool(
+    "api_integracao",
+    "Gera integração de API com tratamento de erros e exemplo de uso",
+    {"servico": "string"},
+)
+async def tool_api_integracao(servico: str) -> str:
+    system = "Você é um integrador de APIs. Gere código de integração, auth, tratamento de erro e exemplo de uso."
+    return await _llm_generate(system, f"Serviço/API: {servico}")
+
+
+@tool(
+    "teste_automatizado",
+    "Gera testes automatizados para um trecho de código",
+    {"codigo": "string"},
+)
+async def tool_teste_automatizado(codigo: str) -> str:
+    system = "Você é um engenheiro de testes. Gere testes úteis, cobrindo casos felizes, erros e edge cases."
+    return await _llm_generate(system, f"Código:\n```\n{codigo}\n```")
+
+
+@tool(
+    "otimizar_performance",
+    "Analisa e otimiza performance de um snippet ou arquitetura",
+    {"snippet": "string"},
+)
+async def tool_otimizar_performance(snippet: str) -> str:
+    system = "Você é um especialista em performance web e backend. Aponte gargalos e entregue versão otimizada."
+    return await _llm_generate(system, f"Snippet ou contexto:\n{snippet}")
+
+
+@tool(
+    "gerar_readme",
+    "Cria README completo para um projeto",
+    {"projeto": "string"},
+)
+async def tool_gerar_readme(projeto: str) -> str:
+    system = "Você escreve READMEs excelentes. Gere visão geral, stack, setup, uso, scripts e próximos passos."
+    return await _llm_generate(system, f"Projeto: {projeto}")
+
+
+@tool(
+    "marketing_landing",
+    "Gera hero copy, CTA e estrutura de landing page",
+    {"produto": "string"},
+)
+async def tool_marketing_landing(produto: str) -> str:
+    system = "Você cria landing pages de alta conversão. Gere hero, prova social, CTA, seções e oferta."
+    return await _llm_generate(system, f"Produto: {produto}")
+
+
+@tool(
+    "video_teaser",
+    "Cria roteiro curto de vídeo teaser",
+    {"topico": "string"},
+)
+async def tool_video_teaser(topico: str) -> str:
+    system = "Você escreve roteiros curtos para vídeo teaser, reels e shorts, com gancho forte e CTA."
+    return await _llm_generate(system, f"Tópico: {topico}")
+
+
+@tool(
+    "bio_simulacao",
+    "Executa uma simulação bioinformática em Python no workspace do agente",
+    {"code": "string"},
+)
+async def tool_bio_simulacao(code: str) -> str:
+    prelude = (
+        "# Optional scientific imports\n"
+        "try:\n"
+        "    import Bio  # type: ignore\n"
+        "except Exception:\n"
+        "    pass\n"
+        "try:\n"
+        "    import rdkit  # type: ignore\n"
+        "except Exception:\n"
+        "    pass\n"
+    )
+    return await tool_python(prelude + "\n" + code)
 
 
 def _generate_stats_card(style: str, variant: str) -> str:

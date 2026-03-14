@@ -11,6 +11,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from tools.executor import TOOLS
+
 router = APIRouter()
 
 
@@ -845,6 +847,39 @@ HANDS: list[dict] = [
 # ── In-memory state ──────────────────────────────────────
 _hand_states: dict[str, dict] = {}
 
+HAND_TOOL_OVERRIDES: dict[str, list[str]] = {
+    "browser": ["web_search", "web_fetch", "http_request", "read_file", "write_file"],
+    "collector": ["web_search", "web_fetch", "search_files", "file_write", "file_read"],
+    "lead": ["web_search", "web_fetch", "seo_copy", "file_write", "file_read"],
+    "predictor": ["web_search", "web_fetch", "pesquisa_papers", "file_write", "file_read"],
+    "api-tester": ["http_request", "teste_automatizado", "read_file", "write_file", "search_files"],
+    "content-writer": ["seo_copy", "marketing_landing", "video_teaser", "write_file", "file_read"],
+    "pesquisa-papers": ["pesquisa_papers", "web_search", "web_fetch", "file_write", "file_read"],
+    "gerar-codigo-web": ["gerar_codigo_web", "generate_ui_component", "create_project", "write_file", "read_file", "edit_file"],
+    "debug-codigo": ["debug_codigo", "read_file", "edit_file", "shell", "python"],
+    "gerar-prototipo-app": ["gerar_prototipo_app", "ui_design_sugestao", "generate_ui_component", "gerar_codigo_web"],
+    "gerar-imagem-site": ["gerar_imagem_site", "ui_design_sugestao", "web_search"],
+    "gerar-voz-narracao": ["gerar_voz_narracao", "video_teaser"],
+    "web-search-hand": ["web_search", "web_fetch", "pesquisa_papers", "file_write"],
+    "seo-copy": ["seo_copy", "marketing_landing", "web_search"],
+    "deploy-simulacao": ["deploy_simulacao", "shell", "git", "read_file"],
+    "ui-design-sugestao": ["ui_design_sugestao", "generate_ui_component", "gerar_prototipo_app"],
+    "mobile-responsivo": ["mobile_responsivo", "read_file", "edit_file", "gerar_codigo_web"],
+    "database-setup": ["database_setup", "shell", "python", "write_file"],
+    "api-integracao": ["api_integracao", "http_request", "web_search", "write_file"],
+    "teste-automatizado": ["teste_automatizado", "read_file", "write_file", "shell", "python"],
+    "otimizar-performance": ["otimizar_performance", "read_file", "edit_file", "shell"],
+    "gerar-readme": ["gerar_readme", "read_file", "write_file", "search_files"],
+    "marketing-landing": ["marketing_landing", "gerar_codigo_web", "gerar_imagem_site", "seo_copy"],
+    "video-teaser": ["video_teaser", "gerar_voz_narracao", "seo_copy"],
+    "bio-simulacao": ["bio_simulacao", "pesquisa_papers", "web_search", "file_write"],
+    "imagem-molecula": ["imagem_molecula", "pesquisa_papers", "bio_simulacao"],
+    "coder": ["gerar_codigo_web", "debug_codigo", "read_file", "edit_file", "write_file", "shell", "python", "git", "create_project"],
+    "researcher": ["pesquisa_papers", "web_search", "web_fetch", "file_write", "read_file"],
+    "designer": ["ui_design_sugestao", "generate_ui_component", "gerar_prototipo_app", "gerar_imagem_site"],
+    "devops": ["deploy_simulacao", "shell", "git", "search_files", "read_file"],
+}
+
 
 class HandConfigRequest(BaseModel):
     settings: dict | None = None
@@ -920,7 +955,13 @@ class HandRunRequest(BaseModel):
 
 def _build_hand_system_prompt(hand: dict) -> str:
     """Build a system prompt tailored to a specific hand."""
-    tools_list = ", ".join(hand["tools"])
+    hand_tools = HAND_TOOL_OVERRIDES.get(hand["id"], hand["tools"])
+    available_tools = [tool for tool in hand_tools if tool in TOOLS]
+    if not available_tools:
+        fallback = ["web_search", "web_browse", "read_file", "write_file", "edit_file", "shell", "python"]
+        available_tools = [tool for tool in fallback if tool in TOOLS]
+    preferred_tool = available_tools[0] if available_tools else ""
+    tools_list = ", ".join(available_tools)
     return f"""You are the **{hand['name']}** ({hand['icon']}) — a Hand (ferramenta real) do **Delirium Infinite**, o agente bio-cientista louco autônomo.
 
 ## Identidade
@@ -931,6 +972,9 @@ Você faz parte do sistema Delirium Infinite — um agente autônomo com Hands (
 
 ## Tools Disponíveis
 {tools_list}
+
+## Preferred First Tool
+{preferred_tool or 'No preferred tool'}
 
 Quando precisar usar uma tool, responda com JSON:
 ```json
@@ -948,6 +992,8 @@ Quando precisar usar uma tool, responda com JSON:
 8. **Se a tool não existir, crie** — use shell/python para criar a ferramenta necessária
 9. **Para sites/apps** — priorize código funcional e deploy-ready
 10. **Para pesquisa/bio** — use fontes reais (PubMed, arXiv) e dados verificáveis
+11. **Tool-first obrigatório** — se a tarefa exigir dados externos, análise de código, geração de artefato ou execução real, use a tool preferida ANTES da resposta final
+12. **Não prometa pesquisar ou gerar depois** — pesquise/execute primeiro, depois responda com base no resultado real da tool
 """
 
 

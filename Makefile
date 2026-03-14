@@ -2,7 +2,7 @@
 # Makefile - Delirium Infinite
 # ═══════════════════════════════════════════════════════════
 
-.PHONY: help install dev build up down logs test backup deploy clean
+.PHONY: help install dev build up down logs test smoke backup deploy clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -45,6 +45,9 @@ logs-frontend: ## View frontend logs only
 test: ## Run all tests
 	cd backend && python -m pytest tests/ -v
 	cd frontend && npm run lint
+
+smoke: ## Run local smoke suite for APIs, tools, and hands
+	python3 scripts/smoke_local.py
 
 backup: ## Backup data and config
 	@bash scripts/backup.sh

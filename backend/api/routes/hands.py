@@ -855,7 +855,7 @@ HAND_TOOL_OVERRIDES: dict[str, list[str]] = {
     "collector": ["add_target", "monitor", "detect_changes", "build_graph", "set_alerts", "web_search", "web_fetch", "file_write", "file_read"],
     "lead": ["search_leads", "enrich_lead", "score_lead", "export_leads", "generate_outreach", "web_search", "web_fetch"],
     "predictor": ["collect_signals", "build_chain", "predict", "track_outcome", "calibrate", "pesquisa_papers", "web_search"],
-    "api-tester": ["discover_endpoints", "generate_tests", "run_suite", "check_coverage", "fuzz_test", "export_report", "http_request"],
+    "api-tester": ["discover_endpoints", "local_http_request", "generate_tests", "run_suite", "check_coverage", "fuzz_test", "export_report", "http_request"],
     "content-writer": ["write_article", "generate_outline", "seo_optimize", "create_social_post", "proofread", "marketing_landing", "file_write"],
     "pesquisa-papers": ["pesquisa_papers", "web_search", "web_fetch", "file_write", "file_read"],
     "gerar-codigo-web": ["gerar_codigo_web", "generate_ui_component", "create_project", "write_file", "read_file", "edit_file"],
@@ -877,10 +877,12 @@ HAND_TOOL_OVERRIDES: dict[str, list[str]] = {
     "video-teaser": ["video_teaser", "gerar_voz_narracao", "seo_copy"],
     "bio-simulacao": ["bio_simulacao", "pesquisa_papers", "web_search", "file_write"],
     "imagem-molecula": ["imagem_molecula", "pesquisa_papers", "bio_simulacao"],
+    "clip": ["download_video", "extract_clip", "add_subtitles", "generate_thumbnail", "format_platform", "video_teaser", "file_write"],
     "coder": ["gerar_codigo_web", "debug_codigo", "read_file", "edit_file", "write_file", "shell", "python", "git", "create_project"],
-    "researcher": ["pesquisa_papers", "web_search", "web_fetch", "file_write", "read_file"],
-    "designer": ["ui_design_sugestao", "generate_ui_component", "gerar_prototipo_app", "gerar_imagem_site"],
-    "devops": ["deploy_simulacao", "shell", "git", "search_files", "read_file"],
+    "crawler": ["crawl_domain", "follow_links", "extract_structured", "build_sitemap", "export_data", "web_fetch", "file_write", "file_read"],
+    "researcher": ["deep_dive", "cross_reference", "fact_check", "generate_report", "cite_sources", "pesquisa_papers", "web_search", "web_fetch", "file_write", "read_file"],
+    "designer": ["design_layout", "create_palette", "generate_icon", "generate_ui_component", "export_figma", "scrape_design", "gerar_prototipo_app"],
+    "devops": ["deploy_app", "manage_docker", "configure_ci", "monitor_uptime", "manage_dns", "scale_service", "deploy_simulacao", "shell", "git", "search_files", "read_file"],
 }
 
 

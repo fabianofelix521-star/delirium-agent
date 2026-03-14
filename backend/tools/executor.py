@@ -5,11 +5,13 @@ import inspect
 import json
 import os
 import re
+import shlex
 import shutil
+from ipaddress import ip_address
 from xml.etree import ElementTree as ET
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus, urljoin, urlparse
 
 import httpx
 
@@ -60,16 +62,20 @@ def _normalize_tool_args(func: Any, args: dict[str, Any]) -> dict[str, Any]:
         return normalized
 
     alias_map = {
-        "target": ["url", "query", "topic", "name", "lead"],
+        "target": ["platform", "provider", "deployment_target", "url", "query", "topic", "name", "lead"],
         "query": ["topic", "keyword", "search", "prompt"],
         "topic": ["query", "question", "subject"],
-        "url": ["target", "base_url", "website", "link"],
+        "url": ["domain", "target", "base_url", "website", "link"],
         "base_url": ["url", "target"],
+        "brief": ["layout_type", "page", "pagina", "description", "concept"],
         "text": ["content", "input_text", "body", "message"],
-        "input_text": ["text", "content", "body"],
-        "content": ["text", "body", "input_text"],
+        "input_text": ["text", "content", "body", "summary"],
+        "content": ["sections", "summary", "report", "text", "body", "input_text"],
         "lead": ["target", "query", "name"],
         "question": ["topic", "query"],
+        "path": ["context", "directory", "project_path", "repo_path", "output_file"],
+        "project_path": ["context", "directory", "path", "repo_path"],
+        "title": ["headline", "report_title", "name"],
     }
 
     for name, parameter in params.items():
@@ -131,6 +137,127 @@ async def _llm_generate(system_prompt: str, user_prompt: str, max_tokens: int = 
 
 def _llm_failed(result: str) -> bool:
         return result.startswith("ERROR: specialized LLM generation failed:")
+
+
+def _is_local_development() -> bool:
+    return os.getenv("APP_ENV", "development").lower() == "development" and not os.getenv("RAILWAY_ENVIRONMENT")
+
+
+def _hostname_is_internal(hostname: str) -> bool:
+    if not hostname:
+        return False
+    normalized = hostname.lower()
+    if normalized in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
+        return True
+    if normalized.endswith(".internal") or normalized.endswith(".local"):
+        return True
+    try:
+        ip = ip_address(normalized)
+        return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+    except ValueError:
+        return False
+
+
+def _hostname_is_loopback(hostname: str) -> bool:
+    if not hostname:
+        return False
+    normalized = hostname.lower()
+    if normalized in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
+        return True
+    try:
+        return ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+def _extract_text_from_html(html: str, limit: int = 8000) -> str:
+    text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > limit:
+        text = text[:limit] + "\n... [truncated]"
+    return text
+
+
+def _render_http_response(resp: Any) -> str:
+    result = f"Status: {resp.status_code}\n"
+    content_type = resp.headers.get("content-type", "")
+    if "json" in content_type:
+        try:
+            result += json.dumps(resp.json(), indent=2, ensure_ascii=False)[:6000]
+        except Exception:
+            result += resp.text[:6000]
+    elif "html" in content_type:
+        result += _extract_text_from_html(resp.text, limit=6000)
+    else:
+        result += resp.text[:6000]
+    return result
+
+
+def _local_app_request_sync(url: str, method: str, headers: dict[str, str], body: Any) -> str:
+    from fastapi.testclient import TestClient
+    from main import app
+
+    parsed = urlparse(url)
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+
+    request_headers = {key: value for key, value in headers.items() if key.lower() != "host"}
+    with TestClient(app) as client:
+        response = client.request(method.upper(), path, headers=request_headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
+    return _render_http_response(response)
+
+
+async def _safe_http_request(url: str, method: str = "GET", headers: dict | None = None, body: Any = None, allow_internal: bool = False) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return "ERROR: Only http/https URLs are allowed"
+
+    hostname = parsed.hostname or ""
+    internal = _hostname_is_internal(hostname)
+    if internal:
+        if not allow_internal:
+            return "ERROR: Access to internal network addresses is blocked"
+        if not _is_local_development() or not _hostname_is_loopback(hostname):
+            return "ERROR: Internal access is only allowed for loopback targets in local development"
+        if parsed.port in (None, 8000) and (parsed.path.startswith("/api") or parsed.path == "/health"):
+            request_headers = {"User-Agent": "Delirium/1.0"}
+            if headers:
+                request_headers.update(headers)
+            return await asyncio.to_thread(_local_app_request_sync, url, method, request_headers, body)
+
+    req_headers = {"User-Agent": "Delirium/1.0"}
+    if headers:
+        req_headers.update(headers)
+
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+        if method.upper() == "GET":
+            resp = await client.get(url, headers=req_headers)
+        elif method.upper() == "POST":
+            resp = await client.post(url, headers=req_headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
+        elif method.upper() == "PUT":
+            resp = await client.put(url, headers=req_headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
+        elif method.upper() == "DELETE":
+            resp = await client.delete(url, headers=req_headers)
+        else:
+            return f"ERROR: Unsupported method: {method}"
+    return _render_http_response(resp)
+
+
+async def _fetch_text_with_ssl_fallback(url: str, timeout: int = 15) -> httpx.Response:
+    headers = {"User-Agent": "Delirium/1.0"}
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response
+    except Exception:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, verify=False) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response
 
 
 def _browser_executable() -> str | None:
@@ -652,40 +779,20 @@ async def tool_search_files(pattern: str, path: str = "", glob: str = "*") -> st
 @tool(
     "http_request",
     "Make an HTTP request (GET, POST, PUT, DELETE) to any API endpoint",
+    {"method": "string (GET/POST/PUT/DELETE)", "url": "string", "headers": "object (optional)", "body": "object or string (optional)", "allow_internal": "boolean (optional, default false)"},
+)
+async def tool_http_request(url: str, method: str = "GET", headers: dict | None = None, body: Any = None, allow_internal: bool = False) -> str:
+    """Make HTTP requests with SSRF protection and optional local-loopback access."""
+    return await _safe_http_request(url, method=method, headers=headers, body=body, allow_internal=allow_internal)
+
+
+@tool(
+    "local_http_request",
+    "Make an HTTP request to a local loopback endpoint in local development only",
     {"method": "string (GET/POST/PUT/DELETE)", "url": "string", "headers": "object (optional)", "body": "object or string (optional)"},
 )
-async def tool_http_request(url: str, method: str = "GET", headers: dict | None = None, body: Any = None) -> str:
-    """Make HTTP requests to external APIs."""
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        return "ERROR: Only http/https URLs are allowed"
-    hostname = parsed.hostname or ""
-    if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "::1") or hostname.endswith(".internal") or hostname.endswith(".local"):
-        return "ERROR: Access to internal network addresses is blocked"
-    req_headers = {"User-Agent": "Delirium/1.0"}
-    if headers:
-        req_headers.update(headers)
-    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
-        if method.upper() == "GET":
-            resp = await client.get(url, headers=req_headers)
-        elif method.upper() == "POST":
-            resp = await client.post(url, headers=req_headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
-        elif method.upper() == "PUT":
-            resp = await client.put(url, headers=req_headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
-        elif method.upper() == "DELETE":
-            resp = await client.delete(url, headers=req_headers)
-        else:
-            return f"ERROR: Unsupported method: {method}"
-    result = f"Status: {resp.status_code}\n"
-    ct = resp.headers.get("content-type", "")
-    if "json" in ct:
-        try:
-            result += json.dumps(resp.json(), indent=2, ensure_ascii=False)[:6000]
-        except Exception:
-            result += resp.text[:6000]
-    else:
-        result += resp.text[:6000]
-    return result
+async def tool_local_http_request(url: str, method: str = "GET", headers: dict | None = None, body: Any = None) -> str:
+    return await _safe_http_request(url, method=method, headers=headers, body=body, allow_internal=True)
 
 
 @tool(
@@ -1639,7 +1746,8 @@ async def tool_discover_endpoints(base_url: str) -> str:
     results: list[str] = []
     for candidate in candidates:
         try:
-            text = await tool_http_request(candidate)
+            allow_internal = _is_local_development() and _hostname_is_loopback(urlparse(candidate).hostname or "")
+            text = await tool_http_request(candidate, allow_internal=allow_internal)
             results.append(f"## {candidate}\n{text[:1800]}")
         except Exception as e:
             results.append(f"## {candidate}\nERROR: {e}")
@@ -1685,8 +1793,9 @@ async def tool_check_coverage(command: str = "pytest --cov=. --cov-report=term-m
 async def tool_fuzz_test(url: str, method: str = "GET") -> str:
     variants = [url, url + "?test='\"<script>", url + "?id=../../../etc/passwd"]
     outputs = []
+    allow_internal = _is_local_development() and _hostname_is_loopback(urlparse(url).hostname or "")
     for variant in variants:
-        outputs.append(f"## {variant}\n{await tool_http_request(variant, method=method)}")
+        outputs.append(f"## {variant}\n{await tool_http_request(variant, method=method, allow_internal=allow_internal)}")
     return "\n\n".join(outputs)
 
 
@@ -1762,6 +1871,376 @@ async def tool_seo_optimize(text: str, keyword: str = "") -> str:
     if _llm_failed(result):
         return text
     return result
+
+
+@tool(
+    "deep_dive",
+    "Perform deep web research on a topic using search and fetched pages",
+    {"query": "string", "max_results": "integer (optional, default 4)"},
+)
+async def tool_deep_dive(query: str, max_results: int = 4) -> str:
+    from ddgs import DDGS
+
+    results = list(DDGS().text(query, max_results=max(1, min(max_results, 6))))
+    if not results:
+        return "No sources found."
+
+    sections = [f"# Deep Dive: {query}"]
+    for item in results[:max_results]:
+        page_text = await tool_web_fetch(item["href"])
+        sections.append(f"## {item['title']}\nURL: {item['href']}\nSummary: {item['body']}\n\nExtract: {page_text[:1200]}")
+    return "\n\n".join(sections)
+
+
+@tool(
+    "cross_reference",
+    "Cross-reference multiple sources or claims and synthesize overlaps and conflicts",
+    {"topic": "string", "sources": "string (optional)"},
+)
+async def tool_cross_reference(topic: str, sources: str = "") -> str:
+    source_material = sources or await tool_deep_dive(topic, max_results=3)
+    system = "Compare the sources, identify overlap, contradictions, and strongest signals."
+    result = await _llm_generate(system, f"Topic: {topic}\n\nSources:\n{source_material[:5000]}", max_tokens=1400)
+    if _llm_failed(result):
+        return f"Cross-reference summary for {topic}: consolidated {len(source_material)} characters of source material."
+    return result
+
+
+@tool(
+    "fact_check",
+    "Fact-check a claim using web evidence",
+    {"claim": "string"},
+)
+async def tool_fact_check(claim: str) -> str:
+    evidence = await tool_web_search(claim, max_results=5)
+    system = "Fact-check the claim. Return verdict, confidence, and evidence bullets."
+    result = await _llm_generate(system, f"Claim: {claim}\n\nEvidence:\n{evidence[:4000]}", max_tokens=1200)
+    if _llm_failed(result):
+        return f"Fact-check fallback for claim: {claim}\nEvidence gathered:\n{evidence[:1200]}"
+    return result
+
+
+@tool(
+    "generate_report",
+    "Generate a structured markdown report and optionally save it",
+    {"title": "string", "content": "string", "path": "string (optional)"},
+)
+async def tool_generate_report(title: str, content: Any, path: str = "") -> str:
+    if isinstance(content, (dict, list)):
+        rendered = json.dumps(content, ensure_ascii=False, indent=2)
+    else:
+        rendered = str(content).strip()
+    report = f"# {title}\n\nGenerated by Delirium Infinite\n\n{rendered}\n"
+    if path:
+        await tool_write_file(path, report)
+        return f"Report saved to {path}\n\n{report[:2000]}"
+    return report
+
+
+@tool(
+    "cite_sources",
+    "Extract or generate a source list from text",
+    {"text": "string"},
+)
+async def tool_cite_sources(text: str) -> str:
+    urls = re.findall(r"https?://[^\s)\]]+", text)
+    if urls:
+        unique = list(dict.fromkeys(urls))[:20]
+        return "\n".join(f"- {url}" for url in unique)
+    return await tool_web_search(text[:200], max_results=5)
+
+
+@tool(
+    "create_palette",
+    "Create a UI color palette with CSS variables",
+    {"brief": "string"},
+)
+async def tool_create_palette(brief: str) -> str:
+    system = "Create a modern UI color palette. Return CSS variables with semantic names and a short rationale."
+    result = await _llm_generate(system, brief, max_tokens=900)
+    if _llm_failed(result):
+        return ":root {\n  --bg-void: #09111a;\n  --surface-glass: rgba(255,255,255,0.08);\n  --accent-primary: #20c997;\n  --accent-secondary: #ff8a3d;\n  --text-primary: #f3f6fb;\n  --text-muted: #99a7b8;\n}"
+    return result
+
+
+@tool(
+    "design_layout",
+    "Design a screen or page layout structure",
+    {"brief": "string"},
+)
+async def tool_design_layout(brief: str) -> str:
+    system = "Design a page layout with sections, hierarchy, interactions, and responsive notes."
+    result = await _llm_generate(system, brief, max_tokens=1400)
+    if _llm_failed(result):
+        return f"Layout for: {brief}\n1. Hero\n2. Supporting grid\n3. Social proof\n4. CTA footer"
+    return result
+
+
+@tool(
+    "generate_icon",
+    "Generate a simple SVG icon asset from a concept",
+    {"name": "string", "style": "string (optional)"},
+)
+async def tool_generate_icon(name: str, style: str = "minimal") -> str:
+    initial = (name[:1] or "I").upper()
+    svg = f"""<svg width=\"128\" height=\"128\" viewBox=\"0 0 128 128\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect x=\"8\" y=\"8\" width=\"112\" height=\"112\" rx=\"28\" fill=\"#0f172a\" stroke=\"#38bdf8\" stroke-width=\"4\"/>\n  <text x=\"64\" y=\"76\" text-anchor=\"middle\" font-size=\"56\" font-family=\"Arial\" fill=\"#f8fafc\">{initial}</text>\n</svg>"""
+    return f"Style: {style}\n\n{svg}"
+
+
+@tool(
+    "export_figma",
+    "Export a Figma-like design spec to a JSON file",
+    {"name": "string", "spec": "string", "path": "string (optional)"},
+)
+async def tool_export_figma(name: str, spec: str, path: str = "exports/figma-spec.json") -> str:
+    payload = {
+        "name": name,
+        "generated_at": asyncio.get_event_loop().time(),
+        "spec": spec,
+        "tool": "export_figma",
+    }
+    return await tool_write_file(path, json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+@tool(
+    "deploy_app",
+    "Generate a safe deploy plan for a project target",
+    {"target": "string (optional, default railway)", "project_path": "string (optional, default .)"},
+)
+async def tool_deploy_app(target: str = "railway", project_path: str = ".") -> str:
+    files = await tool_list_files(project_path)
+    git_status = await tool_git("status --short")
+    return f"Deploy target: {target}\n\nProject files:\n{files[:1500]}\n\nGit status:\n{git_status[:1200]}"
+
+
+@tool(
+    "manage_docker",
+    "Inspect Docker state with safe read-only actions",
+    {"action": "string (status, ps, compose-config, compose-services)", "path": "string (optional, default .)"},
+)
+async def tool_manage_docker(action: str = "status", path: str = ".", dockerfile: str = "", tags: Any = None) -> str:
+    action = action.strip().lower()
+    quoted_path = shlex.quote(path)
+    if action == "ps":
+        return await tool_shell("docker ps")
+    if action in {"build", "compose-build"}:
+        tag_list = ", ".join(tags) if isinstance(tags, list) else (str(tags) if tags else "latest")
+        dockerfile_part = f" using {dockerfile}" if dockerfile else ""
+        return f"Docker build plan for {path}{dockerfile_part}: tags={tag_list}. Run a local build only after validating compose config and required env vars."
+    if action == "compose-config":
+        return await tool_shell(f"cd {quoted_path} && docker compose config")
+    if action == "compose-services":
+        return await tool_shell(f"cd {quoted_path} && docker compose config --services")
+    return await tool_shell("docker info | head -60")
+
+
+@tool(
+    "configure_ci",
+    "Generate CI configuration content",
+    {"platform": "string (optional, default github-actions)", "project_name": "string (optional)"},
+)
+async def tool_configure_ci(platform: str = "github-actions", project_name: str = "app") -> str:
+    platform = platform.lower().strip()
+    if platform == "github-actions":
+        return f"""name: CI\non:\n  push:\n    branches: [main]\n  pull_request:\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: Setup Node\n        uses: actions/setup-node@v4\n        with:\n          node-version: 20\n      - name: Setup Python\n        uses: actions/setup-python@v5\n        with:\n          python-version: '3.11'\n      - name: Install backend deps\n        run: pip install -r backend/requirements.txt\n      - name: Install frontend deps\n        run: cd frontend && npm ci\n      - name: Smoke\n        run: python3 scripts/smoke_local.py --mode ci\n"""
+    return f"CI configuration stub for {platform} and project {project_name}"
+
+
+@tool(
+    "monitor_uptime",
+    "Check uptime/status for a URL",
+    {"url": "string"},
+)
+async def tool_monitor_uptime(url: str) -> str:
+    allow_internal = _is_local_development() and _hostname_is_loopback(urlparse(url).hostname or "")
+    return await tool_http_request(url, allow_internal=allow_internal)
+
+
+@tool(
+    "manage_dns",
+    "Generate DNS change guidance for a domain",
+    {"domain": "string", "provider": "string (optional)"},
+)
+async def tool_manage_dns(domain: str, provider: str = "generic") -> str:
+    return f"DNS plan for {domain} via {provider}:\n- Verify apex and www records\n- Configure CNAME/ALIAS\n- Validate SSL and propagation\n- Recheck webhook and callback domains"
+
+
+@tool(
+    "scale_service",
+    "Generate a safe scale recommendation for a service",
+    {"service": "string", "replicas": "integer (optional, default 1)"},
+)
+async def tool_scale_service(service: str, replicas: int = 1) -> str:
+    return f"Scale recommendation for {service}: set desired replicas to {replicas} and verify CPU, memory, connection pool, queue depth, and rollback path."
+
+
+@tool(
+    "download_video",
+    "Download a video via yt-dlp when available",
+    {"url": "string", "output_path": "string (optional)"},
+)
+async def tool_download_video(url: str, output_path: str = "videos/input.mp4") -> str:
+    if not shutil.which("yt-dlp"):
+        return "ERROR: yt-dlp is not installed"
+    target = Path(WORKSPACE) / output_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return await tool_shell(f"yt-dlp -o '{target}' '{url}'")
+
+
+@tool(
+    "extract_clip",
+    "Extract a clip from a video with ffmpeg when available",
+    {"video_path": "string", "start": "string (optional)", "duration": "integer (optional)", "output_path": "string (optional)"},
+)
+async def tool_extract_clip(video_path: str, start: str = "00:00:00", duration: int = 30, output_path: str = "clips/clip.mp4") -> str:
+    if not shutil.which("ffmpeg"):
+        return "ERROR: ffmpeg is not installed"
+    source = Path(video_path) if os.path.isabs(video_path) else Path(WORKSPACE) / video_path
+    target = Path(output_path) if os.path.isabs(output_path) else Path(WORKSPACE) / output_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return await tool_shell(f"ffmpeg -y -ss {start} -i '{source}' -t {duration} -c:v libx264 -c:a aac '{target}'")
+
+
+@tool(
+    "add_subtitles",
+    "Add subtitles to a video or emit an SRT when ffmpeg is unavailable",
+    {"video_path": "string", "subtitles_text": "string", "output_path": "string (optional)"},
+)
+async def tool_add_subtitles(video_path: str, subtitles_text: str, output_path: str = "clips/subtitled.mp4") -> str:
+    srt_path = Path(WORKSPACE) / "clips" / "captions.srt"
+    srt_path.parent.mkdir(parents=True, exist_ok=True)
+    srt_content = f"1\n00:00:00,000 --> 00:00:05,000\n{subtitles_text.strip()}\n"
+    srt_path.write_text(srt_content)
+    if not shutil.which("ffmpeg"):
+        return f"Subtitle file created at {srt_path}"
+    source = Path(video_path) if os.path.isabs(video_path) else Path(WORKSPACE) / video_path
+    target = Path(output_path) if os.path.isabs(output_path) else Path(WORKSPACE) / output_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return await tool_shell(f"ffmpeg -y -i '{source}' -vf subtitles='{srt_path}' '{target}'")
+
+
+@tool(
+    "generate_thumbnail",
+    "Generate a thumbnail from a video with ffmpeg when available",
+    {"video_path": "string", "output_path": "string (optional)"},
+)
+async def tool_generate_thumbnail(video_path: str, output_path: str = "clips/thumbnail.jpg") -> str:
+    if not shutil.which("ffmpeg"):
+        return "ERROR: ffmpeg is not installed"
+    source = Path(video_path) if os.path.isabs(video_path) else Path(WORKSPACE) / video_path
+    target = Path(output_path) if os.path.isabs(output_path) else Path(WORKSPACE) / output_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return await tool_shell(f"ffmpeg -y -i '{source}' -frames:v 1 '{target}'")
+
+
+@tool(
+    "format_platform",
+    "Format video content guidance for a target platform",
+    {"platform": "string", "content": "string"},
+)
+async def tool_format_platform(platform: str, content: str) -> str:
+    return f"Platform: {platform}\n\nHook: {content[:120]}\nAspect ratio: 9:16\nLength: 15-45s\nCaption style: bold, high contrast, center-safe"
+
+
+async def _crawl_pages(start_url: str, max_pages: int = 10, max_depth: int = 2) -> list[dict[str, Any]]:
+    base = urlparse(start_url)
+    if base.scheme not in ("http", "https"):
+        return []
+    seen: set[str] = set()
+    queue: list[tuple[str, int]] = [(start_url, 0)]
+    pages: list[dict[str, Any]] = []
+
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        while queue and len(pages) < max_pages:
+            url, depth = queue.pop(0)
+            if url in seen or depth > max_depth:
+                continue
+            seen.add(url)
+            try:
+                response = await _fetch_text_with_ssl_fallback(url, timeout=15)
+            except Exception:
+                continue
+            html = response.text
+            title_match = re.search(r"<title[^>]*>([^<]+)</title>", html, re.IGNORECASE)
+            links = []
+            for href in re.findall(r'href=["\']([^"\']+)["\']', html, re.IGNORECASE):
+                absolute = urljoin(str(response.url), href)
+                parsed = urlparse(absolute)
+                if parsed.scheme in ("http", "https") and parsed.netloc == base.netloc:
+                    links.append(absolute)
+                    if absolute not in seen and depth < max_depth and len(queue) + len(pages) < max_pages * 3:
+                        queue.append((absolute, depth + 1))
+            pages.append({
+                "url": str(response.url),
+                "title": title_match.group(1).strip() if title_match else "Untitled",
+                "depth": depth,
+                "links": list(dict.fromkeys(links))[:25],
+                "text": _extract_text_from_html(html, limit=1500),
+            })
+    return pages
+
+
+@tool(
+    "crawl_domain",
+    "Crawl a domain and summarize discovered pages",
+    {"url": "string", "max_pages": "integer (optional)", "max_depth": "integer (optional)"},
+)
+async def tool_crawl_domain(url: str, max_pages: int = 10, max_depth: int = 2) -> str:
+    pages = await _crawl_pages(url, max_pages=max_pages, max_depth=max_depth)
+    return json.dumps({"pages": pages, "count": len(pages)}, ensure_ascii=False)
+
+
+@tool(
+    "follow_links",
+    "Follow links from a starting URL within the same domain",
+    {"url": "string", "max_pages": "integer (optional)", "max_depth": "integer (optional)"},
+)
+async def tool_follow_links(url: str, max_pages: int = 10, max_depth: int = 2) -> str:
+    return await tool_crawl_domain(url, max_pages=max_pages, max_depth=max_depth)
+
+
+@tool(
+    "extract_structured",
+    "Extract structured metadata from a webpage",
+    {"url": "string"},
+)
+async def tool_extract_structured(url: str) -> str:
+    response = await _fetch_text_with_ssl_fallback(url, timeout=15)
+    html = response.text
+    title = re.search(r"<title[^>]*>([^<]+)</title>", html, re.IGNORECASE)
+    description = re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    headings = re.findall(r"<h[1-3][^>]*>(.*?)</h[1-3]>", html, re.IGNORECASE | re.DOTALL)
+    links = re.findall(r'href=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    return json.dumps({
+        "url": str(response.url),
+        "title": title.group(1).strip() if title else "",
+        "description": description.group(1).strip() if description else "",
+        "headings": [_extract_text_from_html(h, limit=160) for h in headings[:20]],
+        "links": links[:50],
+    }, ensure_ascii=False, indent=2)
+
+
+@tool(
+    "build_sitemap",
+    "Build an XML sitemap from crawled pages",
+    {"url": "string", "max_pages": "integer (optional)"},
+)
+async def tool_build_sitemap(url: str, max_pages: int = 20) -> str:
+    pages = await _crawl_pages(url, max_pages=max_pages, max_depth=2)
+    xml_lines = ["<?xml version=\"1.0\" encoding=\"UTF-8\"?>", '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for page in pages:
+        xml_lines.append(f"  <url><loc>{page['url']}</loc></url>")
+    xml_lines.append("</urlset>")
+    return "\n".join(xml_lines)
+
+
+@tool(
+    "export_data",
+    "Export arbitrary data to a file",
+    {"data": "string", "path": "string (optional)"},
+)
+async def tool_export_data(data: str, path: str = "exports/crawl-data.json") -> str:
+    return await tool_write_file(path, data)
 
 
 def _generate_stats_card(style: str, variant: str) -> str:

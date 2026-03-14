@@ -18,7 +18,10 @@ router = APIRouter()
 
 def _check_cmd(cmd: str) -> bool:
     """Check if a command is available on the system."""
-    return shutil.which(cmd) is not None
+    if not cmd:
+        return False
+    options = [part.strip() for part in cmd.split("|") if part.strip()]
+    return any(shutil.which(option) is not None or (option.startswith("/") and os.path.exists(option)) for option in options)
 
 
 # ── Hand Definitions ─────────────────────────────────────
@@ -39,7 +42,7 @@ HANDS: list[dict] = [
         ],
         "requirements": [
             {"label": "Python 3 must be installed", "check": "python3", "met": True},
-            {"label": "Chromium or Google Chrome must be installed", "check": "chromium", "met": True},
+            {"label": "Chromium or Google Chrome must be installed", "check": "chromium|chromium-browser|google-chrome|google-chrome-stable|chrome|/Applications/Google Chrome.app/Contents/MacOS/Google Chrome|/Applications/Chromium.app/Contents/MacOS/Chromium", "met": True},
         ],
         "metrics": [
             {"name": "Pages Visited", "type": "number"},
@@ -848,12 +851,12 @@ HANDS: list[dict] = [
 _hand_states: dict[str, dict] = {}
 
 HAND_TOOL_OVERRIDES: dict[str, list[str]] = {
-    "browser": ["web_search", "web_fetch", "http_request", "read_file", "write_file"],
-    "collector": ["web_search", "web_fetch", "search_files", "file_write", "file_read"],
-    "lead": ["web_search", "web_fetch", "seo_copy", "file_write", "file_read"],
-    "predictor": ["web_search", "web_fetch", "pesquisa_papers", "file_write", "file_read"],
-    "api-tester": ["http_request", "teste_automatizado", "read_file", "write_file", "search_files"],
-    "content-writer": ["seo_copy", "marketing_landing", "video_teaser", "write_file", "file_read"],
+    "browser": ["browser_navigate", "browser_read_page", "browser_click", "browser_type", "browser_screenshot", "browser_close", "web_search"],
+    "collector": ["add_target", "monitor", "detect_changes", "build_graph", "set_alerts", "web_search", "web_fetch", "file_write", "file_read"],
+    "lead": ["search_leads", "enrich_lead", "score_lead", "export_leads", "generate_outreach", "web_search", "web_fetch"],
+    "predictor": ["collect_signals", "build_chain", "predict", "track_outcome", "calibrate", "pesquisa_papers", "web_search"],
+    "api-tester": ["discover_endpoints", "generate_tests", "run_suite", "check_coverage", "fuzz_test", "export_report", "http_request"],
+    "content-writer": ["write_article", "generate_outline", "seo_optimize", "create_social_post", "proofread", "marketing_landing", "file_write"],
     "pesquisa-papers": ["pesquisa_papers", "web_search", "web_fetch", "file_write", "file_read"],
     "gerar-codigo-web": ["gerar_codigo_web", "generate_ui_component", "create_project", "write_file", "read_file", "edit_file"],
     "debug-codigo": ["debug_codigo", "read_file", "edit_file", "shell", "python"],
@@ -985,9 +988,12 @@ Você faz parte do sistema Delirium Infinite — um agente autônomo com Hands (
 ## Preferred First Tool
 {preferred_tool or 'No preferred tool'}
 
+## Mandatory Tool Kickoff
+If the task is executable, data-backed, or artifact-producing, your FIRST response must be a JSON tool call using `{preferred_tool or 'an available tool'}` or another clearly better available tool. Do not start with prose.
+
 Quando precisar usar uma tool, responda com JSON:
 ```json
-{{"tool": "nome_da_tool", "param": "valor"}}
+{{"tool": "nome_da_tool", "args": {{"param": "valor"}}}}
 ```
 
 ## Regras de Execução

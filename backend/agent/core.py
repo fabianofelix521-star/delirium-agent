@@ -4,6 +4,7 @@ Handles message processing, tool execution, reasoning loops, and multi-agent rou
 """
 
 from __future__ import annotations
+import inspect
 import json
 import re
 import time
@@ -249,6 +250,17 @@ class AgentOrchestrator:
                 try:
                     data = json.loads(match.group(1))
                     if "tool" in data and data["tool"] in TOOLS:
+                        if "args" not in data or not isinstance(data.get("args"), dict):
+                            extra = {k: v for k, v in data.items() if k != "tool" and k != "args"}
+                            if "param" in extra and len(extra) == 1:
+                                func = TOOLS[data["tool"]]["function"]
+                                params = list(inspect.signature(func).parameters.keys())
+                                if params:
+                                    data["args"] = {params[0]: extra["param"]}
+                                else:
+                                    data["args"] = {}
+                            else:
+                                data["args"] = extra
                         return data
                 except (json.JSONDecodeError, KeyError):
                     continue

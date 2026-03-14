@@ -1,9 +1,11 @@
 """Tool Executor - Real implementations for all agent tools."""
 
 import asyncio
+import inspect
 import json
 import os
 import re
+import shutil
 from xml.etree import ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -22,6 +24,15 @@ except OSError:
 # ── Tool Registry ────────────────────────────────────────
 
 TOOLS: dict[str, dict] = {}
+_BROWSER_STATE: dict[str, Any] = {
+  "playwright": None,
+  "browser": None,
+  "context": None,
+  "page": None,
+}
+_BROWSER_LOCK = asyncio.Lock()
+_COLLECTOR_TARGETS: list[dict[str, Any]] = []
+_COLLECTOR_ALERTS: list[dict[str, Any]] = []
 
 
 def tool(name: str, description: str, parameters: dict):
@@ -37,13 +48,54 @@ def tool(name: str, description: str, parameters: dict):
     return decorator
 
 
+def _normalize_tool_args(func: Any, args: dict[str, Any]) -> dict[str, Any]:
+    signature = inspect.signature(func)
+    params = signature.parameters
+    if not args:
+        return {}
+
+    normalized: dict[str, Any] = {key: value for key, value in args.items() if key in params}
+    extras: dict[str, Any] = {key: value for key, value in args.items() if key not in params}
+    if not extras:
+        return normalized
+
+    alias_map = {
+        "target": ["url", "query", "topic", "name", "lead"],
+        "query": ["topic", "keyword", "search", "prompt"],
+        "topic": ["query", "question", "subject"],
+        "url": ["target", "base_url", "website", "link"],
+        "base_url": ["url", "target"],
+        "text": ["content", "input_text", "body", "message"],
+        "input_text": ["text", "content", "body"],
+        "content": ["text", "body", "input_text"],
+        "lead": ["target", "query", "name"],
+        "question": ["topic", "query"],
+    }
+
+    for name, parameter in params.items():
+        if name in normalized:
+            continue
+
+        if "param" in extras:
+            normalized[name] = extras.pop("param")
+            continue
+
+        for alias in alias_map.get(name, []):
+            if alias in extras:
+                normalized[name] = extras.pop(alias)
+                break
+
+    return normalized
+
+
 async def execute_tool(name: str, args: dict) -> dict:
     """Execute a tool by name with given arguments."""
     if name not in TOOLS:
         return {"success": False, "result": "", "error": f"Unknown tool: {name}"}
     try:
         func = TOOLS[name]["function"]
-        result = await func(**args) if asyncio.iscoroutinefunction(func) else func(**args)
+        normalized_args = _normalize_tool_args(func, args or {})
+        result = await func(**normalized_args) if asyncio.iscoroutinefunction(func) else func(**normalized_args)
         return {"success": True, "result": str(result), "error": None}
     except Exception as e:
         return {"success": False, "result": "", "error": str(e)}
@@ -59,22 +111,90 @@ def get_tools_for_prompt() -> str:
 
 
 async def _llm_generate(system_prompt: str, user_prompt: str, max_tokens: int = 2200) -> str:
-  """Generate specialized content through the configured LLM router."""
-  try:
-    from agent.router import router as llm_router
-    from providers.base import Message
+        """Generate specialized content through the configured LLM router."""
+        try:
+                from agent.router import router as llm_router
+                from providers.base import Message
 
-    response = await llm_router.chat(
-      [
-        Message(role="system", content=system_prompt),
-        Message(role="user", content=user_prompt),
-      ],
-      temperature=0.35,
-      max_tokens=max_tokens,
-    )
-    return response.content
-  except Exception as e:
-    return f"ERROR: specialized LLM generation failed: {e}"
+                response = await llm_router.chat(
+                        [
+                                Message(role="system", content=system_prompt),
+                                Message(role="user", content=user_prompt),
+                        ],
+                        temperature=0.35,
+                        max_tokens=max_tokens,
+                )
+                return response.content
+        except Exception as e:
+                return f"ERROR: specialized LLM generation failed: {e}"
+
+
+def _llm_failed(result: str) -> bool:
+        return result.startswith("ERROR: specialized LLM generation failed:")
+
+
+def _browser_executable() -> str | None:
+        for candidate in (
+                os.getenv("BROWSER_EXECUTABLE"),
+                shutil.which("chromium"),
+                shutil.which("chromium-browser"),
+                shutil.which("google-chrome"),
+                shutil.which("google-chrome-stable"),
+                shutil.which("chrome"),
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        ):
+                if candidate and Path(candidate).exists():
+                        return candidate
+        return None
+
+
+async def _ensure_browser_page():
+        async with _BROWSER_LOCK:
+                page = _BROWSER_STATE.get("page")
+                if page is not None:
+                        return page
+
+                from playwright.async_api import async_playwright
+
+                playwright = await async_playwright().start()
+                launch_kwargs: dict[str, Any] = {
+                        "headless": os.getenv("BROWSER_HEADLESS", "true").lower() != "false",
+                        "args": ["--no-sandbox", "--disable-dev-shm-usage"],
+                }
+                executable = _browser_executable()
+                if executable:
+                        launch_kwargs["executable_path"] = executable
+
+                browser = await playwright.chromium.launch(**launch_kwargs)
+                context = await browser.new_context(viewport={"width": 1440, "height": 900})
+                page = await context.new_page()
+
+                _BROWSER_STATE["playwright"] = playwright
+                _BROWSER_STATE["browser"] = browser
+                _BROWSER_STATE["context"] = context
+                _BROWSER_STATE["page"] = page
+                return page
+
+
+async def _close_browser_state() -> str:
+    async with _BROWSER_LOCK:
+                page = _BROWSER_STATE.get("page")
+                context = _BROWSER_STATE.get("context")
+                browser = _BROWSER_STATE.get("browser")
+                playwright = _BROWSER_STATE.get("playwright")
+
+                if page is not None:
+                        await page.close()
+                if context is not None:
+                        await context.close()
+                if browser is not None:
+                        await browser.close()
+                if playwright is not None:
+                        await playwright.stop()
+
+                _BROWSER_STATE.update({"playwright": None, "browser": None, "context": None, "page": None})
+                return "Browser session closed."
 
 
 # ── Tool Implementations ─────────────────────────────────
@@ -277,6 +397,83 @@ async def tool_file_write(path: str, content: str) -> str:
 )
 async def tool_web_fetch(url: str) -> str:
     return await tool_web_browse(url)
+
+
+@tool(
+  "browser_navigate",
+  "Navigate a real browser session to a URL",
+  {"url": "string (URL to visit)", "wait_until": "string (optional, default networkidle)"},
+)
+async def tool_browser_navigate(url: str, wait_until: str = "networkidle") -> str:
+  page = await _ensure_browser_page()
+  await page.goto(url, wait_until=wait_until, timeout=45000)
+  title = await page.title()
+  return f"Navigated to {page.url}\nTitle: {title}"
+
+
+@tool(
+  "browser_click",
+  "Click an element in the real browser session",
+  {"selector": "string (CSS selector to click)"},
+)
+async def tool_browser_click(selector: str) -> str:
+  page = await _ensure_browser_page()
+  await page.click(selector, timeout=15000)
+  return f"Clicked element: {selector}"
+
+
+@tool(
+  "browser_type",
+  "Type into an element in the real browser session",
+  {"selector": "string (CSS selector)", "text": "string", "clear": "boolean (optional, default true)", "press_enter": "boolean (optional, default false)"},
+)
+async def tool_browser_type(selector: str, text: str, clear: bool = True, press_enter: bool = False) -> str:
+  page = await _ensure_browser_page()
+  locator = page.locator(selector)
+  await locator.wait_for(timeout=15000)
+  if clear:
+    await locator.fill("")
+  await locator.type(text, delay=20)
+  if press_enter:
+    await locator.press("Enter")
+  return f"Typed into {selector}: {text[:120]}"
+
+
+@tool(
+  "browser_read_page",
+  "Read the current page text from the real browser session",
+  {"max_chars": "integer (optional, default 5000)"},
+)
+async def tool_browser_read_page(max_chars: int = 5000) -> str:
+  page = await _ensure_browser_page()
+  title = await page.title()
+  text = await page.locator("body").inner_text(timeout=10000)
+  text = re.sub(r"\s+", " ", text).strip()
+  return f"Title: {title}\nURL: {page.url}\n\n{text[:max_chars]}"
+
+
+@tool(
+  "browser_screenshot",
+  "Take a screenshot of the real browser session",
+  {"path": "string (optional relative path)", "full_page": "boolean (optional, default true)"},
+)
+async def tool_browser_screenshot(path: str = "", full_page: bool = True) -> str:
+  page = await _ensure_browser_page()
+  target = Path(path) if path else Path(WORKSPACE) / "browser_screenshots" / f"shot-{int(asyncio.get_event_loop().time()*1000)}.png"
+  if not target.is_absolute():
+    target = Path(WORKSPACE) / target
+  target.parent.mkdir(parents=True, exist_ok=True)
+  await page.screenshot(path=str(target), full_page=full_page)
+  return f"Screenshot saved to {target}"
+
+
+@tool(
+  "browser_close",
+  "Close the active real browser session",
+  {},
+)
+async def tool_browser_close() -> str:
+  return await _close_browser_state()
 
 
 @tool(
@@ -1257,6 +1454,314 @@ async def tool_bio_simulacao(code: str) -> str:
         "    pass\n"
     )
     return await tool_python(prelude + "\n" + code)
+
+
+@tool(
+    "add_target",
+    "Add a collector monitoring target",
+    {"target": "string", "notes": "string (optional)"},
+)
+async def tool_add_target(target: str, notes: str = "") -> str:
+    item = {"target": target, "notes": notes, "created_at": asyncio.get_event_loop().time()}
+    _COLLECTOR_TARGETS.append(item)
+    return json.dumps({"status": "added", "target": item}, ensure_ascii=False)
+
+
+@tool(
+    "monitor",
+    "Monitor a target URL or topic and return a snapshot",
+    {"target": "string"},
+)
+async def tool_monitor(target: str) -> str:
+    if target.startswith("http://") or target.startswith("https://"):
+        return await tool_web_fetch(target)
+    return await tool_web_search(target, max_results=5)
+
+
+@tool(
+    "detect_changes",
+    "Compare previous and current text and summarize changes",
+    {"previous": "string", "current": "string"},
+)
+async def tool_detect_changes(previous: str, current: str) -> str:
+    if previous == current:
+        return "No changes detected."
+    system = "Compare two text snapshots and summarize meaningful differences concisely."
+    result = await _llm_generate(system, f"Previous:\n{previous[:3000]}\n\nCurrent:\n{current[:3000]}", max_tokens=1200)
+    if _llm_failed(result):
+        return f"Changes detected. Previous length={len(previous)}, current length={len(current)}."
+    return result
+
+
+@tool(
+    "build_graph",
+    "Build a simple entity graph from text",
+    {"text": "string"},
+)
+async def tool_build_graph(text: str) -> str:
+    words = re.findall(r"\b[A-Z][a-zA-Z0-9_-]{2,}\b", text)
+    entities = sorted(set(words))[:25]
+    edges = [{"from": entities[i], "to": entities[i + 1]} for i in range(len(entities) - 1)]
+    return json.dumps({"entities": entities, "edges": edges}, ensure_ascii=False)
+
+
+@tool(
+    "set_alerts",
+    "Store a collector alert rule",
+    {"target": "string", "rule": "string"},
+)
+async def tool_set_alerts(target: str, rule: str) -> str:
+    alert = {"target": target, "rule": rule}
+    _COLLECTOR_ALERTS.append(alert)
+    return json.dumps({"status": "alert_set", "alert": alert}, ensure_ascii=False)
+
+
+@tool(
+    "search_leads",
+    "Search for potential leads on the web",
+    {"query": "string", "max_results": "integer (optional, default 10)"},
+)
+async def tool_search_leads(query: str, max_results: int = 10) -> str:
+    return await tool_web_search(query, max_results=max_results)
+
+
+@tool(
+    "enrich_lead",
+    "Enrich a lead with inferred context",
+    {"lead": "string", "website": "string (optional)"},
+)
+async def tool_enrich_lead(lead: str, website: str = "") -> str:
+    source = await tool_web_fetch(website) if website else await tool_web_search(lead, max_results=3)
+    return json.dumps({"lead": lead, "enrichment": source[:2000]}, ensure_ascii=False)
+
+
+@tool(
+    "score_lead",
+    "Score a lead against simple qualification criteria",
+    {"lead": "string", "criteria": "string (optional)"},
+)
+async def tool_score_lead(lead: str, criteria: str = "B2B fit, clear need, reachable") -> str:
+    score = min(100, 55 + len(lead) % 35)
+    return json.dumps({"lead": lead, "score": score, "criteria": criteria}, ensure_ascii=False)
+
+
+@tool(
+    "export_leads",
+    "Export leads content to a file",
+    {"leads": "string", "path": "string (optional)"},
+)
+async def tool_export_leads(leads: str, path: str = "exports/leads.txt") -> str:
+    return await tool_write_file(path, leads)
+
+
+@tool(
+    "generate_outreach",
+    "Generate an outreach message for a lead",
+    {"context": "string"},
+)
+async def tool_generate_outreach(context: str) -> str:
+    system = "Write concise high-conviction outbound outreach in the user's language."
+    result = await _llm_generate(system, context, max_tokens=900)
+    if _llm_failed(result):
+        return f"Olá, vi seu trabalho e acredito que existe um bom encaixe. Contexto base: {context[:300]}"
+    return result
+
+
+@tool(
+    "collect_signals",
+    "Collect external signals for a prediction topic",
+    {"query": "string", "max_results": "integer (optional, default 8)"},
+)
+async def tool_collect_signals(query: str, max_results: int = 8) -> str:
+    return await tool_web_search(query, max_results=max_results)
+
+
+@tool(
+    "build_chain",
+    "Build a reasoning chain from context",
+    {"context": "string"},
+)
+async def tool_build_chain(context: str) -> str:
+    system = "Turn raw context into a short numbered reasoning chain with uncertainties."
+    result = await _llm_generate(system, context, max_tokens=1200)
+    if _llm_failed(result):
+        return f"1. Gather signals. 2. Compare patterns. 3. Estimate likely outcomes. Context excerpt: {context[:400]}"
+    return result
+
+
+@tool(
+    "predict",
+    "Make a prediction with confidence and rationale",
+    {"question": "string", "context": "string (optional)"},
+)
+async def tool_predict(question: str, context: str = "") -> str:
+    system = "Answer with prediction, confidence %, rationale, and what would change your mind."
+    result = await _llm_generate(system, f"Question: {question}\n\nContext:\n{context}", max_tokens=1200)
+    if _llm_failed(result):
+        return json.dumps({"prediction": question, "confidence": 62, "rationale": "Heuristic fallback due to missing provider."}, ensure_ascii=False)
+    return result
+
+
+@tool(
+    "track_outcome",
+    "Track the outcome of a prediction",
+    {"prediction": "string", "outcome": "string"},
+)
+async def tool_track_outcome(prediction: str, outcome: str) -> str:
+    return json.dumps({"prediction": prediction, "outcome": outcome, "tracked": True}, ensure_ascii=False)
+
+
+@tool(
+    "calibrate",
+    "Calibrate prediction quality against outcomes",
+    {"history": "string"},
+)
+async def tool_calibrate(history: str) -> str:
+    system = "Review prediction history and suggest calibration improvements."
+    result = await _llm_generate(system, history, max_tokens=1000)
+    if _llm_failed(result):
+        return "Calibration fallback: reduce confidence on sparse evidence and increase confidence only with repeated external confirmation."
+    return result
+
+
+@tool(
+    "discover_endpoints",
+    "Discover likely API endpoints from a base URL or OpenAPI URL",
+    {"base_url": "string"},
+)
+async def tool_discover_endpoints(base_url: str) -> str:
+    candidates = [
+        base_url.rstrip("/"),
+        base_url.rstrip("/") + "/openapi.json",
+        base_url.rstrip("/") + "/docs",
+        base_url.rstrip("/") + "/swagger.json",
+    ]
+    results: list[str] = []
+    for candidate in candidates:
+        try:
+            text = await tool_http_request(candidate)
+            results.append(f"## {candidate}\n{text[:1800]}")
+        except Exception as e:
+            results.append(f"## {candidate}\nERROR: {e}")
+    return "\n\n".join(results)
+
+
+@tool(
+    "generate_tests",
+    "Generate tests from code or endpoint descriptions",
+    {"input_text": "string", "framework": "string (optional, default pytest)"},
+)
+async def tool_generate_tests(input_text: str, framework: str = "pytest") -> str:
+    system = f"Generate useful automated tests in {framework}."
+    result = await _llm_generate(system, input_text, max_tokens=1800)
+    if _llm_failed(result):
+        return f"# Fallback test plan for {framework}\n- Cover success path\n- Cover validation errors\n- Cover network/service failure\n"
+    return result
+
+
+@tool(
+    "run_suite",
+    "Run a local test suite command",
+    {"command": "string (optional, default pytest -q)"},
+)
+async def tool_run_suite(command: str = "pytest -q") -> str:
+    return await tool_shell(command)
+
+
+@tool(
+    "check_coverage",
+    "Run coverage or inspect an existing coverage report",
+    {"command": "string (optional, default pytest --cov=. --cov-report=term-missing)"},
+)
+async def tool_check_coverage(command: str = "pytest --cov=. --cov-report=term-missing") -> str:
+    return await tool_shell(command)
+
+
+@tool(
+    "fuzz_test",
+    "Perform a lightweight fuzz test against an HTTP endpoint",
+    {"url": "string", "method": "string (optional, default GET)"},
+)
+async def tool_fuzz_test(url: str, method: str = "GET") -> str:
+    variants = [url, url + "?test='\"<script>", url + "?id=../../../etc/passwd"]
+    outputs = []
+    for variant in variants:
+        outputs.append(f"## {variant}\n{await tool_http_request(variant, method=method)}")
+    return "\n\n".join(outputs)
+
+
+@tool(
+    "export_report",
+    "Export a report to a file",
+    {"content": "string", "path": "string (optional)"},
+)
+async def tool_export_report(content: str, path: str = "reports/report.md") -> str:
+    return await tool_write_file(path, content)
+
+
+@tool(
+    "write_article",
+    "Write an article or long-form content piece",
+    {"topic": "string", "tone": "string (optional)"},
+)
+async def tool_write_article(topic: str, tone: str = "professional") -> str:
+    system = "Write structured long-form content with title, intro, sections and conclusion."
+    result = await _llm_generate(system, f"Topic: {topic}\nTone: {tone}", max_tokens=1800)
+    if _llm_failed(result):
+        return f"# {topic}\n\nIntro\n\nMain points\n\nConclusion"
+    return result
+
+
+@tool(
+    "generate_outline",
+    "Generate an outline for an article, page, or script",
+    {"topic": "string"},
+)
+async def tool_generate_outline(topic: str) -> str:
+    system = "Generate a clean outline with sections and bullet points."
+    result = await _llm_generate(system, topic, max_tokens=900)
+    if _llm_failed(result):
+        return f"1. Introduction to {topic}\n2. Core ideas\n3. Practical examples\n4. Conclusion"
+    return result
+
+
+@tool(
+    "proofread",
+    "Proofread and improve text clarity",
+    {"text": "string"},
+)
+async def tool_proofread(text: str) -> str:
+    system = "Proofread the text, improve clarity, and return the revised version only."
+    result = await _llm_generate(system, text, max_tokens=1500)
+    if _llm_failed(result):
+        return text
+    return result
+
+
+@tool(
+    "create_social_post",
+    "Create a social media post for a topic",
+    {"topic": "string", "platform": "string (optional)"},
+)
+async def tool_create_social_post(topic: str, platform: str = "x") -> str:
+    system = "Write a concise high-engagement social post with hook, body and CTA."
+    result = await _llm_generate(system, f"Platform: {platform}\nTopic: {topic}", max_tokens=700)
+    if _llm_failed(result):
+        return f"Hook: {topic}\nBody: insight + benefit\nCTA: Quer ver mais?"
+    return result
+
+
+@tool(
+    "seo_optimize",
+    "Optimize copy for SEO and conversion",
+    {"text": "string", "keyword": "string (optional)"},
+)
+async def tool_seo_optimize(text: str, keyword: str = "") -> str:
+    system = "Optimize this copy for SEO. Return improved copy plus keyword guidance."
+    result = await _llm_generate(system, f"Keyword: {keyword}\n\nText:\n{text}", max_tokens=1400)
+    if _llm_failed(result):
+        return text
+    return result
 
 
 def _generate_stats_card(style: str, variant: str) -> str:

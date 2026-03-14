@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { API_BASE, getAuthHeaders } from "@/lib/api";
+import HandOutputPanel from "@/components/Hands/HandOutputPanel";
 import {
   Loader2,
   Play,
@@ -9,8 +10,6 @@ import {
   X,
   CheckCircle2,
   XCircle,
-  Send,
-  Terminal,
 } from "lucide-react";
 
 /* ─── Types ──────────────────────────────────── */
@@ -41,6 +40,30 @@ interface HandItem {
   runs: number;
 }
 
+function StatusBadge({ status }: { status: string }) {
+  if (status === "ready") {
+    return (
+      <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-[rgba(16,185,129,0.1)] text-[var(--success)] border border-[rgba(16,185,129,0.2)]">
+        Ready
+      </span>
+    );
+  }
+
+  if (status === "active") {
+    return (
+      <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-[rgba(6,182,212,0.1)] text-[var(--accent-cyan)] border border-[rgba(6,182,212,0.2)]">
+        Active
+      </span>
+    );
+  }
+
+  return (
+    <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-[rgba(245,158,11,0.1)] text-[var(--warning)] border border-[rgba(245,158,11,0.2)]">
+      Setup needed
+    </span>
+  );
+}
+
 export default function HandsPage() {
   const [hands, setHands] = useState<HandItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +75,6 @@ export default function HandsPage() {
   const [runOutput, setRunOutput] = useState<string>("");
   const [runTask, setRunTask] = useState<string>("");
   const [runHand_active, setRunHandActive] = useState<HandItem | null>(null);
-  const outputRef = useRef<HTMLDivElement>(null);
 
   const fetchHands = () => {
     fetch(`${API_BASE}/api/hands`, { headers: getAuthHeaders() })
@@ -133,10 +155,6 @@ export default function HandsPage() {
                 if (data.type === "token") {
                   fullResp += data.content;
                   setRunOutput(fullResp);
-                  outputRef.current?.scrollTo(
-                    0,
-                    outputRef.current.scrollHeight,
-                  );
                 } else if (data.type === "error") {
                   fullResp += `\n\n❌ Error: ${data.message}`;
                   setRunOutput(fullResp);
@@ -182,33 +200,25 @@ export default function HandsPage() {
   const active = hands.filter((h) => h.status === "active" || h.enabled);
   const displayed = activeTab === "available" ? available : active;
 
-  const StatusBadge = ({ status }: { status: string }) => {
-    if (status === "ready")
-      return (
-        <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-[rgba(16,185,129,0.1)] text-[var(--success)] border border-[rgba(16,185,129,0.2)]">
-          Ready
-        </span>
-      );
-    if (status === "active")
-      return (
-        <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-[rgba(6,182,212,0.1)] text-[var(--accent-cyan)] border border-[rgba(6,182,212,0.2)]">
-          Active
-        </span>
-      );
-    return (
-      <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-[rgba(245,158,11,0.1)] text-[var(--warning)] border border-[rgba(245,158,11,0.2)]">
-        Setup needed
-      </span>
-    );
-  };
-
   return (
-    <div className="space-y-6 p-4 md:p-8">
+    <div className="space-y-6 p-3 pb-24 md:p-6 xl:p-8">
       {/* Header */}
-      <h2 className="text-2xl font-bold text-[var(--text-primary)]">Hands</h2>
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-[var(--text-ghost)]">
+            Liquid Glass Mobile Surface
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] md:text-3xl">
+            Hands
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+            Ative agents especializados, acompanhe a execução das tools em dropdown e receba relatórios muito mais ricos para desktop e celular.
+          </p>
+        </div>
+      </div>
 
       {/* Info Banner */}
-      <div className="bg-[var(--glass-bg)] border-l-4 border-[var(--accent-cyan)] rounded-xl p-5 backdrop-blur-xl">
+      <div className="apple-liquid-panel overflow-hidden rounded-[24px] border border-cyan-400/15 p-5 md:p-6">
         <h4 className="text-base font-semibold text-[var(--text-primary)] mb-1">
           Hands — Curated Autonomous Capability Packages
         </h4>
@@ -220,7 +230,7 @@ export default function HandsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-[var(--glass-border)]">
+      <div className="apple-liquid-toolbar flex items-center gap-1 overflow-x-auto rounded-[20px] border border-white/10 p-1">
         <button
           onClick={() => setActiveTab("available")}
           className={`px-4 py-2.5 text-sm font-medium transition-all relative ${
@@ -395,62 +405,19 @@ export default function HandsPage() {
 
       {/* ─── Run Output Panel ─── */}
       {(runHand_active || runOutput) && (
-        <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-2xl p-5 backdrop-blur-xl">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-[var(--accent-cyan)]" />
-              {runHand_active
-                ? `${runHand_active.icon} ${runHand_active.name}`
-                : "Hand Output"}
-              {running && (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--accent-cyan)]" />
-              )}
-            </h3>
-            <button
-              onClick={() => {
-                setRunHandActive(null);
-                setRunOutput("");
-                setRunTask("");
-              }}
-              className="p-1 rounded-lg hover:bg-[var(--hover-bg)] text-[var(--text-ghost)]"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          {/* Task input */}
-          <div className="flex gap-2 mb-3">
-            <input
-              type="text"
-              value={runTask}
-              onChange={(e) => setRunTask(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && runHand_active && !running) {
-                  runHand(runHand_active.id, runTask);
-                }
-              }}
-              placeholder="Give a task to this hand (or leave empty for default)..."
-              className="flex-1 px-3 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--glass-border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] focus:outline-none focus:border-[var(--accent-cyan)]"
-            />
-            <button
-              onClick={() =>
-                runHand_active && runHand(runHand_active.id, runTask)
-              }
-              disabled={!runHand_active || !!running}
-              className="px-4 py-2 text-xs font-medium text-white bg-[var(--accent-cyan)] rounded-lg hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-1.5"
-            >
-              <Send className="w-3.5 h-3.5" />
-              Run
-            </button>
-          </div>
-          {/* Output */}
-          <div
-            ref={outputRef}
-            className="bg-[var(--bg-primary)] border border-[var(--glass-border)] rounded-lg p-4 max-h-80 overflow-y-auto font-mono text-xs text-[var(--text-muted)] whitespace-pre-wrap leading-relaxed"
-          >
-            {runOutput ||
-              (running ? "Starting hand..." : "Output will appear here...")}
-          </div>
-        </div>
+        <HandOutputPanel
+          hand={runHand_active}
+          output={runOutput}
+          running={!!running}
+          task={runTask}
+          onTaskChange={setRunTask}
+          onRun={() => runHand_active && runHand(runHand_active.id, runTask)}
+          onClose={() => {
+            setRunHandActive(null);
+            setRunOutput("");
+            setRunTask("");
+          }}
+        />
       )}
 
       {/* ─── Detail Modal ─── */}

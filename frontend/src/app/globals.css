@@ -231,6 +231,102 @@ body::before {
     0 0 20px rgba(99, 102, 241, 0.05);
 }
 
+.apple-liquid-panel {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(15, 23, 32, 0.52);
+  backdrop-filter: blur(34px) saturate(160%);
+  -webkit-backdrop-filter: blur(34px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 30px 80px rgba(3, 8, 15, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.apple-liquid-panel::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.01) 28%,
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+.apple-liquid-toolbar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(9, 14, 22, 0.45);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 50px rgba(5, 10, 18, 0.22);
+}
+
+.report-surface {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.report-markdown {
+  color: var(--text-secondary);
+}
+
+.report-markdown h1 {
+  font-size: clamp(1.65rem, 2vw, 2.15rem);
+  line-height: 1.1;
+}
+
+.report-markdown h2 {
+  font-size: clamp(1.3rem, 1.5vw, 1.6rem);
+  line-height: 1.2;
+}
+
+.report-markdown h3 {
+  font-size: 1.1rem;
+  line-height: 1.3;
+}
+
+.report-markdown strong {
+  color: var(--text-primary);
+}
+
+.report-markdown em {
+  color: #d7e6f7;
+}
+
+.report-markdown p,
+.report-markdown li,
+.report-markdown blockquote {
+  font-size: 0.965rem;
+}
+
+@media (max-width: 768px) {
+  .apple-liquid-panel {
+    backdrop-filter: blur(26px) saturate(150%);
+    -webkit-backdrop-filter: blur(26px) saturate(150%);
+    box-shadow:
+      0 20px 40px rgba(3, 8, 15, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .report-markdown h1 {
+    font-size: 1.45rem;
+  }
+
+  .report-markdown h2 {
+    font-size: 1.22rem;
+  }
+}
+
 /* ═══════ Gradient Text ═══════ */
 .gradient-text {
   background: var(--accent-gradient-vibrant);

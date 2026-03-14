@@ -174,14 +174,17 @@ export function MobileNav() {
 
       {/* Bottom Tab Bar */}
       <nav
-        className="md:hidden flex items-center justify-around shrink-0 mx-3 mb-2 rounded-2xl"
+        className="md:hidden mx-3 mb-2 flex shrink-0 items-center justify-around rounded-3xl"
         style={{
-          height: "56px",
-          background: "var(--glass-bg-solid)",
-          border: "1px solid var(--glass-border)",
-          backdropFilter: "blur(32px)",
-          WebkitBackdropFilter: "blur(32px)",
-          boxShadow: "0 -4px 30px rgba(0,0,0,0.2)",
+          height: "60px",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)), rgba(15,23,32,0.7)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          backdropFilter: "blur(34px) saturate(160%)",
+          WebkitBackdropFilter: "blur(34px) saturate(160%)",
+          boxShadow:
+            "0 -8px 34px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
         }}
       >
         {primaryNavItems.map((item) => {

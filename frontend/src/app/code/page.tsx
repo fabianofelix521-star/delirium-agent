@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { API_BASE, getAuthHeaders } from "@/lib/api";
+import {
+  API_BASE,
+  getAuthHeaders,
+  uploadAttachment,
+  type UploadedAttachment,
+} from "@/lib/api";
+import RichContentRenderer, {
+  stripThinkTags,
+} from "@/components/Shared/RichContentRenderer";
+import { exportRichReportPdf } from "@/lib/exportRichReportPdf";
 import {
   Send,
   Paperclip,
@@ -27,6 +36,7 @@ import {
   Tablet,
   RotateCcw,
   Download,
+  FileText,
   FileCode,
   Clock,
   Plus,
@@ -192,12 +202,6 @@ const LANG_MAP: Record<string, string> = {
   scss: "scss",
   less: "less",
 };
-
-/* ─── Think Tag Stripping ─── */
-
-function stripThinkTags(content: string): string {
-  return content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-}
 
 /* ─── Extraction Helpers ─── */
 
@@ -520,6 +524,10 @@ export default function CodeArenaPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const assistantRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
 
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -635,6 +643,62 @@ export default function CodeArenaPage() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const downloadMessageMarkdown = (content: string, id: string) => {
+    const blob = new Blob([stripThinkTags(content)], {
+      type: "text/markdown;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `code-message-${id}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const buildOutgoingMessage = (
+    text: string,
+    attachedFiles: UploadedAttachment[],
+  ) => {
+    const sections = [text.trim()].filter(Boolean);
+    if (attachedFiles.length > 0) {
+      sections.push(
+        `Attached files:\n${attachedFiles.map((file) => file.markdown).join("\n")}`,
+      );
+    }
+    return sections.join("\n\n").trim();
+  };
+
+  const handleAttachmentSelect = async (files: FileList | null) => {
+    if (!files?.length || uploadingAttachments) return;
+    setUploadingAttachments(true);
+    try {
+      const uploaded = await Promise.all(
+        Array.from(files).map((file) => uploadAttachment(file, "code")),
+      );
+      setAttachments((prev) => [...prev, ...uploaded]);
+    } finally {
+      setUploadingAttachments(false);
+      if (attachmentInputRef.current) {
+        attachmentInputRef.current.value = "";
+      }
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const exportMessagePdf = async (message: Message) => {
+    const element = assistantRefs.current[message.id];
+    if (!element) return;
+    await exportRichReportPdf({
+      element,
+      filename: `code-message-${message.id}.pdf`,
+      title: "Code Delivery",
+      subtitle: stripThinkTags(message.content).slice(0, 140),
+    });
+  };
+
   const processAiResponse = useCallback(
     (
       content: string,
@@ -717,6 +781,7 @@ export default function CodeArenaPage() {
     setProjectTree([]);
     setSelectedFile(null);
     setInput("");
+    setAttachments([]);
   }, []);
 
   // Listen for sidebar restore events
@@ -734,17 +799,19 @@ export default function CodeArenaPage() {
   }, [restoreProject]);
 
   const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
+    const outgoingMessage = buildOutgoingMessage(input, attachments);
+    if (!outgoingMessage || isStreaming) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: outgoingMessage,
       timestamp: Date.now(),
     };
     const currentMessages = [...messages, userMsg];
     setMessages(currentMessages);
     setInput("");
+    setAttachments([]);
     setIsStreaming(true);
 
     const assistantMsg: Message = {
@@ -881,31 +948,6 @@ export default function CodeArenaPage() {
         Math.min(textareaRef.current.scrollHeight, 200) + "px";
     }
   }, [input]);
-
-  const renderMarkdown = (text: string) => {
-    const clean = stripThinkTags(text);
-    return clean
-      .replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang: string, code: string) => {
-        const escaped = code.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        return `<div class="code-block-wrapper my-3 rounded-xl overflow-hidden" style="background:rgba(8,8,20,0.6);border:1px solid var(--glass-border)">
-          <div class="flex items-center justify-between px-3 py-1.5" style="border-bottom:1px solid var(--glass-border);background:rgba(255,255,255,0.02)">
-            <span style="color:var(--text-muted);font-size:0.65rem;font-weight:600;text-transform:uppercase">${lang || "code"}</span>
-          </div>
-          <pre style="margin:0;border:0;border-radius:0;background:transparent !important;overflow-x:auto;padding:12px;font-size:12px;line-height:1.5"><code style="color:var(--text-secondary)">${escaped}</code></pre>
-        </div>`;
-      })
-      .replace(
-        /`([^`]+)`/g,
-        '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px;font-size:0.85em">$1</code>',
-      )
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(
-        /^- (.+)/gm,
-        '<li class="ml-4 list-disc" style="margin-bottom:2px">$1</li>',
-      )
-      .replace(/\n/g, "<br/>");
-  };
 
   const toggleFolder = (path: string) =>
     setExpandedFolders((prev) => {
@@ -1061,10 +1103,9 @@ export default function CodeArenaPage() {
       {/* Mobile Tab Switcher */}
       {(hasPreview || hasProject) && (
         <div
-          className="flex md:hidden shrink-0"
+          className="apple-liquid-toolbar mx-2 mt-2 flex shrink-0 rounded-[18px] md:hidden"
           style={{
-            borderBottom: "1px solid var(--glass-border)",
-            background: "var(--bg-surface)",
+            border: "1px solid var(--glass-border)",
           }}
         >
           <button
@@ -1540,7 +1581,7 @@ export default function CodeArenaPage() {
 
           <div
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto px-4 py-4 relative"
+            className="relative flex-1 overflow-y-auto px-3 py-3 md:px-4"
           >
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full animate-fade-in">
@@ -1651,7 +1692,7 @@ export default function CodeArenaPage() {
                     {msg.role === "user" ? (
                       <div className="flex justify-end mb-4">
                         <div
-                          className="max-w-[85%] rounded-2xl rounded-br-lg px-4 py-3 text-[13px] leading-relaxed"
+                          className="max-w-[90%] rounded-[24px] rounded-br-[12px] px-4 py-3 text-[13px] leading-relaxed md:max-w-[85%]"
                           style={{
                             background: "var(--accent-indigo)",
                             color: "white",
@@ -1676,20 +1717,14 @@ export default function CodeArenaPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div
-                              className="rounded-2xl rounded-bl-lg px-4 py-3 text-[13px] leading-relaxed"
-                              style={{
-                                background: "var(--glass-bg-solid)",
-                                border: "1px solid var(--glass-border)",
-                                boxShadow: "var(--glass-shadow)",
-                                color: "var(--text-primary)",
+                              ref={(node) => {
+                                assistantRefs.current[msg.id] = node;
                               }}
+                              className="apple-liquid-panel rounded-[26px] rounded-bl-[12px] px-4 py-3 text-[13px] leading-relaxed"
+                              style={{ color: "var(--text-primary)" }}
                             >
                               {msg.content ? (
-                                <div
-                                  dangerouslySetInnerHTML={{
-                                    __html: renderMarkdown(msg.content),
-                                  }}
-                                />
+                                <RichContentRenderer content={msg.content} />
                               ) : isStreaming ? (
                                 <div className="flex gap-1.5 py-1">
                                   <div className="typing-dot" />
@@ -1699,7 +1734,7 @@ export default function CodeArenaPage() {
                               ) : null}
                             </div>
                             {msg.content && !isStreaming && (
-                              <div className="flex items-center gap-0.5 mt-1.5 ml-1">
+                              <div className="flex flex-wrap items-center gap-1 mt-1.5 ml-1">
                                 <button
                                   onClick={() =>
                                     handleCopy(msg.content, msg.id)
@@ -1716,6 +1751,22 @@ export default function CodeArenaPage() {
                                     <Copy size={11} />
                                   )}
                                   {copied === msg.id ? "Copied" : "Copy"}
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    downloadMessageMarkdown(msg.content, msg.id)
+                                  }
+                                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium hover:bg-white/[0.04]"
+                                  style={{ color: "var(--text-ghost)" }}
+                                >
+                                  <Download size={11} /> Markdown
+                                </button>
+                                <button
+                                  onClick={() => exportMessagePdf(msg)}
+                                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium hover:bg-white/[0.04]"
+                                  style={{ color: "var(--text-ghost)" }}
+                                >
+                                  <FileText size={11} /> PDF
                                 </button>
                                 {(msg.content.includes("```html") ||
                                   msg.content.includes("```jsx") ||
@@ -1762,12 +1813,19 @@ export default function CodeArenaPage() {
             )}
           </div>
 
-          <div className="shrink-0 px-4 pb-3 pt-1">
+          <div className="shrink-0 px-3 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-2 md:px-4">
             <div
-              className="liquid-glass-solid relative overflow-visible"
+              className="apple-liquid-panel relative overflow-visible"
               style={{ borderRadius: "var(--radius-2xl)" }}
             >
               <div className="flex items-end gap-1 p-2">
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => handleAttachmentSelect(event.target.files)}
+                />
                 <button
                   onClick={() => setShowHistory(!showHistory)}
                   className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-white/[0.04] shrink-0"
@@ -1793,11 +1851,17 @@ export default function CodeArenaPage() {
                   <GitBranch size={16} strokeWidth={2} />
                 </button>
                 <button
+                  onClick={() => attachmentInputRef.current?.click()}
+                  disabled={uploadingAttachments}
                   className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-white/[0.04] shrink-0"
                   style={{ color: "var(--text-ghost)" }}
                   title="Attach"
                 >
-                  <Paperclip size={16} strokeWidth={2} />
+                  {uploadingAttachments ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Paperclip size={16} strokeWidth={2} />
+                  )}
                 </button>
                 <textarea
                   ref={textareaRef}
@@ -1811,14 +1875,14 @@ export default function CodeArenaPage() {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() || isStreaming}
+                  disabled={(!input.trim() && attachments.length === 0) || isStreaming}
                   className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 disabled:opacity-30"
                   style={{
-                    background: input.trim()
+                    background: input.trim() || attachments.length > 0
                       ? "linear-gradient(135deg, #6366f1, #06b6d4)"
                       : "var(--bg-elevated)",
                     color: "white",
-                    boxShadow: input.trim()
+                    boxShadow: input.trim() || attachments.length > 0
                       ? "0 2px 12px rgba(99,102,241,0.3)"
                       : "none",
                   }}
@@ -1830,7 +1894,25 @@ export default function CodeArenaPage() {
                   )}
                 </button>
               </div>
-              <div className="flex items-center gap-2 px-3 pb-2">
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 px-3 pb-2">
+                  {attachments.map((attachment, index) => (
+                    <div
+                      key={`${attachment.url}-${index}`}
+                      className="flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-3 py-1 text-[10px] text-(--text-secondary)"
+                    >
+                      <span className="max-w-[150px] truncate">{attachment.filename}</span>
+                      <button
+                        onClick={() => removeAttachment(index)}
+                        className="text-(--text-ghost) transition hover:text-(--text-primary)"
+                      >
+                        remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2 overflow-x-auto px-3 pb-2">
                 {selectedRepo && (
                   <div
                     className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium"

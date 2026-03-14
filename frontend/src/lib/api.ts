@@ -1,11 +1,46 @@
 export const API_BASE = "";
 
+export interface UploadedAttachment {
+  filename: string;
+  content_type: string;
+  size: number;
+  url: string;
+  public_url: string;
+  markdown: string;
+}
+
 export function getAuthHeaders(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem("delirium_token") : null;
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
+}
+
+export async function uploadAttachment(
+  file: File,
+  scope = "general",
+): Promise<UploadedAttachment> {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("delirium_token") : null;
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(
+    `${API_BASE}/api/system/uploads?scope=${encodeURIComponent(scope)}`,
+    {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    },
+  );
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail || error.message || "Upload failed");
+  }
+
+  return res.json();
 }
 
 export async function apiFetch<T>(

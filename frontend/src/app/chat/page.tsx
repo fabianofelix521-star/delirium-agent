@@ -2,19 +2,25 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { API_BASE, getAuthHeaders } from "@/lib/api";
+import {
+  API_BASE,
+  getAuthHeaders,
+  uploadAttachment,
+  type UploadedAttachment,
+} from "@/lib/api";
+import RichContentRenderer, {
+  stripThinkTags,
+} from "@/components/Shared/RichContentRenderer";
+import { exportRichReportPdf } from "@/lib/exportRichReportPdf";
 import {
   Send,
   Paperclip,
-  Plus,
   Sparkles,
   Loader2,
   Copy,
   RefreshCw,
   Code,
   Globe,
-  BarChart3,
-  Bug,
   Check,
   Terminal,
   FileText,
@@ -29,7 +35,6 @@ import {
   VolumeX,
   Download,
   Brain,
-  Clock,
   ChevronDown,
 } from "lucide-react";
 
@@ -66,6 +71,10 @@ function ChatPageInner() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const assistantRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
 
   // ─── Voice state ──────────────────────────────
   const [isRecording, setIsRecording] = useState(false);
@@ -160,6 +169,73 @@ function ChatPageInner() {
     navigator.clipboard.writeText(text);
     setCopied(id);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const downloadMessageMarkdown = (content: string, id: string) => {
+    const blob = new Blob([stripThinkTags(content)], {
+      type: "text/markdown;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `chat-message-${id}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportMessagePdf = async (message: Message) => {
+    const element = assistantRefs.current[message.id];
+    if (!element) return;
+    await exportRichReportPdf({
+      element,
+      filename: `chat-message-${message.id}.pdf`,
+      title: "Chat Response",
+      subtitle: stripThinkTags(message.content).slice(0, 140),
+    });
+  };
+
+  const retryAssistantResponse = async (messageId: string) => {
+    const index = messages.findIndex((message) => message.id === messageId);
+    if (index <= 0) return;
+    const previousUser = messages
+      .slice(0, index)
+      .reverse()
+      .find((message) => message.role === "user");
+    if (!previousUser) return;
+    await handleSendDirect(previousUser.content);
+  };
+
+  const buildOutgoingMessage = (
+    text: string,
+    attachedFiles: UploadedAttachment[],
+  ) => {
+    const sections = [text.trim()].filter(Boolean);
+    if (attachedFiles.length > 0) {
+      sections.push(
+        `Attached files:\n${attachedFiles.map((file) => file.markdown).join("\n")}`,
+      );
+    }
+    return sections.join("\n\n").trim();
+  };
+
+  const handleAttachmentSelect = async (files: FileList | null) => {
+    if (!files?.length || uploadingAttachments) return;
+    setUploadingAttachments(true);
+    try {
+      const uploaded = await Promise.all(
+        Array.from(files).map((file) => uploadAttachment(file, "chat")),
+      );
+      setAttachments((prev) => [...prev, ...uploaded]);
+    } finally {
+      setUploadingAttachments(false);
+      if (attachmentInputRef.current) {
+        attachmentInputRef.current.value = "";
+      }
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
   };
 
   // ─── Voice: TTS playback ──────────────────────
@@ -405,17 +481,22 @@ function ChatPageInner() {
     sendVoiceMessageRef.current = sendVoiceMessage;
   }, [sendVoiceMessage]);
 
-  const handleSendDirect = async (text: string) => {
-    if (!text.trim() || isStreaming) return;
+  const handleSendDirect = async (
+    text: string,
+    attachedFiles: UploadedAttachment[] = [],
+  ) => {
+    const outgoingMessage = buildOutgoingMessage(text, attachedFiles);
+    if (!outgoingMessage || isStreaming) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: text.trim(),
+      content: outgoingMessage,
       timestamp: Date.now(),
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setAttachments([]);
     setIsStreaming(true);
 
     // Agent steps simulation
@@ -451,7 +532,7 @@ function ChatPageInner() {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          message: modePrefix + text.trim(),
+          message: modePrefix + outgoingMessage,
           conversation_id: conversationId || undefined,
           stream: true,
           provider: activeProvider,
@@ -588,8 +669,8 @@ function ChatPageInner() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
-    await handleSendDirect(input);
+    if ((!input.trim() && attachments.length === 0) || isStreaming) return;
+    await handleSendDirect(input, attachments);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -606,90 +687,6 @@ function ChatPageInner() {
         Math.min(textareaRef.current.scrollHeight, 200) + "px";
     }
   }, [input]);
-
-  const renderMarkdown = (text: string) => {
-    return text
-      .replace(
-        /```(\w*)\n([\s\S]*?)```/g,
-        (_match, lang: string, code: string) => {
-          const escaped = code.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const ext =
-            lang === "python"
-              ? "py"
-              : lang === "javascript"
-                ? "js"
-                : lang === "typescript"
-                  ? "ts"
-                  : lang === "html"
-                    ? "html"
-                    : lang === "css"
-                      ? "css"
-                      : lang === "json"
-                        ? "json"
-                        : lang === "bash" || lang === "sh"
-                          ? "sh"
-                          : lang || "txt";
-          return `<div class="code-block-wrapper my-3 rounded-xl overflow-hidden" style="background:rgba(8,8,20,0.6);border:1px solid var(--glass-border)">
-                    <div class="flex items-center justify-between px-3 py-1.5" style="border-bottom:1px solid var(--glass-border);background:rgba(255,255,255,0.02)">
-                        <span style="color:var(--text-ghost);font-size:0.65rem;font-weight:600;text-transform:uppercase">${lang || "code"}</span>
-                        <div class="flex items-center gap-1">
-                            <button class="download-code-btn" data-filename="code.${ext}" style="color:var(--text-ghost);font-size:0.65rem;padding:2px 6px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:3px" title="Download">↓ Download</button>
-                            <button class="copy-code-btn" style="color:var(--text-ghost);font-size:0.65rem;padding:2px 6px;border-radius:4px;cursor:pointer">Copy</button>
-                        </div>
-                    </div>
-                    <pre style="margin:0;border:0;border-radius:0;background:transparent !important"><code class="language-${lang}">${escaped}</code></pre>
-                </div>`;
-        },
-      )
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(
-        /^- (.+)/gm,
-        '<li class="ml-4 list-disc" style="margin-bottom:2px">$1</li>',
-      )
-      .replace(/\n/g, "<br/>");
-  };
-
-  // Event delegation for copy/download buttons in code blocks
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // Copy button
-      if (target.closest(".copy-code-btn")) {
-        const wrapper = target.closest(".code-block-wrapper");
-        const code = wrapper?.querySelector("code")?.textContent || "";
-        navigator.clipboard.writeText(code);
-        const btn = target.closest(".copy-code-btn") as HTMLElement;
-        btn.textContent = "Copied!";
-        setTimeout(() => {
-          btn.textContent = "Copy";
-        }, 1500);
-      }
-      // Download button
-      if (target.closest(".download-code-btn")) {
-        const wrapper = target.closest(".code-block-wrapper");
-        const code = wrapper?.querySelector("code")?.textContent || "";
-        const btn = target.closest(".download-code-btn") as HTMLElement;
-        const filename = btn.dataset.filename || "code.txt";
-        const blob = new Blob([code], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        btn.textContent = "✓ Downloaded";
-        setTimeout(() => {
-          btn.innerHTML = "↓ Download";
-        }, 1500);
-      }
-    };
-    container.addEventListener("click", handler);
-    return () => container.removeEventListener("click", handler);
-  }, []);
 
   const getStepIcon = (type: string) => {
     switch (type) {
@@ -715,14 +712,14 @@ function ChatPageInner() {
         {/* Messages */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-16 xl:px-24 py-4 relative"
+          className="flex-1 overflow-y-auto px-3 py-3 md:px-8 lg:px-16 xl:px-24"
         >
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full animate-fade-in">
               {/* Hero logo */}
               <div className="relative mb-8">
                 <div
-                  className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center animate-float relative"
+                  className="relative flex h-18 w-18 items-center justify-center rounded-2xl animate-float"
                   style={{
                     background: "var(--accent-gradient)",
                     boxShadow: "var(--accent-glow-strong)",
@@ -758,7 +755,7 @@ function ChatPageInner() {
                     /* User message */
                     <div className="flex justify-end mb-4">
                       <div
-                        className="max-w-[75%] rounded-2xl rounded-br-lg px-4 py-3 text-[13px] leading-relaxed"
+                        className="max-w-[88%] rounded-3xl rounded-br-xl px-4 py-3 text-[13px] leading-relaxed md:max-w-[75%]"
                         style={{
                           background: "var(--accent-indigo)",
                           color: "white",
@@ -879,7 +876,7 @@ function ChatPageInner() {
                                     [msg.id]: !p[msg.id],
                                   }))
                                 }
-                                className="flex items-center gap-2 w-full px-3 py-2 text-left transition-colors hover:bg-white/[0.02]"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/2"
                               >
                                 {msg.thinking &&
                                 !msg.content &&
@@ -958,20 +955,14 @@ function ChatPageInner() {
                           )}
 
                           <div
-                            className="rounded-2xl rounded-bl-lg px-4 py-3 text-[13px] leading-relaxed relative"
-                            style={{
-                              background: "var(--glass-bg-solid)",
-                              border: "1px solid var(--glass-border)",
-                              boxShadow: "var(--glass-shadow)",
-                              color: "var(--text-primary)",
+                            ref={(node) => {
+                              assistantRefs.current[msg.id] = node;
                             }}
+                            className="apple-liquid-panel relative rounded-[26px] rounded-bl-xl px-4 py-3 text-[13px] leading-relaxed"
+                            style={{ color: "var(--text-primary)" }}
                           >
                             {msg.content ? (
-                              <div
-                                dangerouslySetInnerHTML={{
-                                  __html: renderMarkdown(msg.content),
-                                }}
-                              />
+                              <RichContentRenderer content={msg.content} />
                             ) : isStreaming ? (
                               <div className="flex gap-1.5 py-1">
                                 <div className="typing-dot" />
@@ -983,10 +974,10 @@ function ChatPageInner() {
 
                           {/* Message actions */}
                           {msg.content && !isStreaming && (
-                            <div className="flex items-center gap-0.5 mt-1.5 ml-1">
+                            <div className="flex flex-wrap items-center gap-1 mt-1.5 ml-1">
                               <button
                                 onClick={() => handleCopy(msg.content, msg.id)}
-                                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium hover:bg-white/[0.04] transition-colors"
+                                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors hover:bg-white/4"
                                 style={{ color: "var(--text-ghost)" }}
                               >
                                 {copied === msg.id ? (
@@ -1000,7 +991,24 @@ function ChatPageInner() {
                                 {copied === msg.id ? "Copied" : "Copy"}
                               </button>
                               <button
-                                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium hover:bg-white/[0.04] transition-colors"
+                                onClick={() =>
+                                  downloadMessageMarkdown(msg.content, msg.id)
+                                }
+                                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors hover:bg-white/4"
+                                style={{ color: "var(--text-ghost)" }}
+                              >
+                                <Download size={11} /> Markdown
+                              </button>
+                              <button
+                                onClick={() => exportMessagePdf(msg)}
+                                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors hover:bg-white/4"
+                                style={{ color: "var(--text-ghost)" }}
+                              >
+                                <FileText size={11} /> PDF
+                              </button>
+                              <button
+                                onClick={() => retryAssistantResponse(msg.id)}
+                                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors hover:bg-white/4"
                                 style={{ color: "var(--text-ghost)" }}
                               >
                                 <RefreshCw size={11} /> Retry
@@ -1035,19 +1043,32 @@ function ChatPageInner() {
         </div>
 
         {/* Input area */}
-        <div className="shrink-0 px-4 md:px-8 lg:px-16 xl:px-24 pb-4 pt-1">
+        <div className="shrink-0 px-3 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-2 md:px-8 lg:px-16 xl:px-24">
           <div
-            className="liquid-glass-solid relative overflow-visible"
+            className="apple-liquid-panel relative overflow-visible"
             style={{ borderRadius: "var(--radius-2xl)" }}
           >
             {/* Input row */}
             <div className="flex items-end gap-1 p-2">
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(event) => handleAttachmentSelect(event.target.files)}
+              />
               <button
-                className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:bg-white/[0.04] shrink-0"
+                onClick={() => attachmentInputRef.current?.click()}
+                disabled={uploadingAttachments}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all hover:bg-white/4"
                 style={{ color: "var(--text-ghost)" }}
                 title="Attach file"
               >
-                <Paperclip size={16} strokeWidth={2} />
+                {uploadingAttachments ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Paperclip size={16} strokeWidth={2} />
+                )}
               </button>
               <textarea
                 ref={textareaRef}
@@ -1110,14 +1131,14 @@ function ChatPageInner() {
               )}
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || isStreaming}
+                disabled={(!input.trim() && attachments.length === 0) || isStreaming}
                 className="w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0 disabled:opacity-30"
                 style={{
-                  background: input.trim()
+                  background: input.trim() || attachments.length > 0
                     ? "var(--accent-gradient)"
                     : "var(--bg-elevated)",
                   color: "white",
-                  boxShadow: input.trim()
+                  boxShadow: input.trim() || attachments.length > 0
                     ? "0 2px 12px rgba(99,102,241,0.3)"
                     : "none",
                 }}
@@ -1130,8 +1151,27 @@ function ChatPageInner() {
               </button>
             </div>
 
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-3 pb-2">
+                {attachments.map((attachment, index) => (
+                  <div
+                    key={`${attachment.url}-${index}`}
+                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-3 py-1 text-[10px] text-(--text-secondary)"
+                  >
+                    <span className="max-w-36 truncate">{attachment.filename}</span>
+                    <button
+                      onClick={() => removeAttachment(index)}
+                      className="text-(--text-ghost) transition hover:text-(--text-primary)"
+                    >
+                      remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Bottom bar with capabilities */}
-            <div className="flex items-center gap-2 px-3 pb-2 relative z-10">
+            <div className="flex items-center gap-2 px-3 pb-2 relative z-10 overflow-x-auto">
               {[
                 { icon: Code, label: "Code" },
                 { icon: Globe, label: "Web" },
@@ -1151,7 +1191,7 @@ function ChatPageInner() {
                         return next;
                       })
                     }
-                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${isActive ? "" : "hover:bg-white/[0.03]"}`}
+                    className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-all ${isActive ? "" : "hover:bg-white/3"}`}
                     style={{
                       color: isActive
                         ? "var(--accent-indigo)"
@@ -1170,7 +1210,7 @@ function ChatPageInner() {
               })}
               <button
                 onClick={() => setVoiceEnabled((v) => !v)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${voiceEnabled ? "" : "hover:bg-white/[0.03]"}`}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-all ${voiceEnabled ? "" : "hover:bg-white/3"}`}
                 style={{
                   color: voiceEnabled
                     ? "var(--accent-violet)"

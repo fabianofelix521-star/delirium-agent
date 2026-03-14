@@ -18,6 +18,7 @@ import psutil
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from api.auth import router as auth_router
 from api.routes.chat import router as chat_router
@@ -96,6 +97,10 @@ app.include_router(approvals_router, prefix="/api/approvals", tags=["approvals"]
 app.include_router(comms_router, prefix="/api/comms", tags=["comms"])
 app.include_router(runtime_router, prefix="/api/runtime", tags=["runtime"])
 app.include_router(copilot_router, prefix="/api/copilot", tags=["copilot"])
+
+uploads_dir = Path(__file__).resolve().parent / "data" / "uploads"
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 # ─── Health Check ────────────────────────────────────────

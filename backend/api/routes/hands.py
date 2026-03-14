@@ -881,6 +881,16 @@ HAND_TOOL_OVERRIDES: dict[str, list[str]] = {
 }
 
 
+def _get_effective_hand_tools(hand: dict) -> list[str]:
+    """Return the actual callable tools for a hand after overrides/filtering."""
+    hand_tools = HAND_TOOL_OVERRIDES.get(hand["id"], hand["tools"])
+    available_tools = [tool for tool in hand_tools if tool in TOOLS]
+    if not available_tools:
+        fallback = ["web_search", "web_browse", "read_file", "write_file", "edit_file", "shell", "python"]
+        available_tools = [tool for tool in fallback if tool in TOOLS]
+    return available_tools
+
+
 class HandConfigRequest(BaseModel):
     settings: dict | None = None
     enabled: bool = True
@@ -893,6 +903,7 @@ async def list_hands():
     hands = []
     for h in HANDS:
         state = _hand_states.get(h["id"], {})
+        effective_tools = _get_effective_hand_tools(h)
         # Check requirements dynamically
         reqs = []
         all_met = True
@@ -911,6 +922,8 @@ async def list_hands():
             status = "active"
         hands.append({
             **h,
+            "declared_tools": h["tools"],
+            "tools": effective_tools,
             "requirements": reqs,
             "status": status,
             "enabled": state.get("enabled", False),
@@ -926,7 +939,7 @@ async def get_hand(hand_id: str):
     for h in HANDS:
         if h["id"] == hand_id:
             state = _hand_states.get(hand_id, {})
-            return {**h, "enabled": state.get("enabled", False),
+            return {**h, "declared_tools": h["tools"], "tools": _get_effective_hand_tools(h), "enabled": state.get("enabled", False),
                     "last_run": state.get("last_run"), "runs": state.get("runs", 0)}
     raise HTTPException(status_code=404, detail="Hand not found")
 
@@ -955,11 +968,7 @@ class HandRunRequest(BaseModel):
 
 def _build_hand_system_prompt(hand: dict) -> str:
     """Build a system prompt tailored to a specific hand."""
-    hand_tools = HAND_TOOL_OVERRIDES.get(hand["id"], hand["tools"])
-    available_tools = [tool for tool in hand_tools if tool in TOOLS]
-    if not available_tools:
-        fallback = ["web_search", "web_browse", "read_file", "write_file", "edit_file", "shell", "python"]
-        available_tools = [tool for tool in fallback if tool in TOOLS]
+    available_tools = _get_effective_hand_tools(hand)
     preferred_tool = available_tools[0] if available_tools else ""
     tools_list = ", ".join(available_tools)
     return f"""You are the **{hand['name']}** ({hand['icon']}) — a Hand (ferramenta real) do **Delirium Infinite**, o agente bio-cientista louco autônomo.
